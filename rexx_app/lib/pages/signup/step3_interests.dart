@@ -102,7 +102,10 @@ class _Step3InterestsState extends State<Step3Interests> {
 
   String? get _reactionText {
     if (_selected.isEmpty) return null;
-    final lastOption = _exerciseOptions.firstWhere((o) => o.id == _lastSelectedId);
+    final lastOption = _exerciseOptions.firstWhere(
+      (o) => o.id == _lastSelectedId,
+      orElse: () => _exerciseOptions.first,
+    );
 
     if (_selected.length == 1) {
       return lastOption.reaction;

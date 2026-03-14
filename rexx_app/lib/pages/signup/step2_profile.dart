@@ -168,14 +168,24 @@ class _Step2ProfileState extends State<Step2Profile> {
               children: [
                 const Text('🔒', style: TextStyle(fontSize: 18)),
                 const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    '신체 정보 비공개',
-                    style: TextStyle(
-                      color: textMain,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        '신체 정보 비공개',
+                        style: TextStyle(
+                          color: textMain,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        '커뮤니티에서 다른 회원에게 숨깁니다',
+                        style: TextStyle(fontSize: 10, color: textSub),
+                      ),
+                    ],
                   ),
                 ),
                 Switch(
@@ -207,8 +217,8 @@ class _Step2ProfileState extends State<Step2Profile> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    '신체 정보는 운동 자세 분석의 정확도를 높이는 데 사용됩니다. '
-                    '비공개로 설정하면 다른 사용자에게 표시되지 않습니다.',
+                    'ℹ️ 신체 정보는 자세 분석 피드백에 활용됩니다. '
+                    '공개 설정은 마이페이지에서 변경 가능합니다.',
                     style: TextStyle(color: textSub, fontSize: 11, height: 1.5),
                   ),
                 ),

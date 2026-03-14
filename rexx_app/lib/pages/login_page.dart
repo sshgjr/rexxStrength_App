@@ -21,15 +21,20 @@ class _LoginPageState extends State<LoginPage> {
 
   bool loading = false;
   String? errorMessage;
+  String? emailError;
+  String? passwordError;
 
   Future<void> _login() async {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => errorMessage = '이메일과 비밀번호를 입력해주세요.');
-      return;
-    }
+    setState(() {
+      emailError = email.isEmpty ? '이메일을 입력해주세요' : null;
+      passwordError = password.isEmpty ? '비밀번호를 입력해주세요' : null;
+      errorMessage = null;
+    });
+
+    if (email.isEmpty || password.isEmpty) return;
 
     setState(() {
       loading = true;
@@ -42,10 +47,21 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.pop(context, result);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        errorMessage = e.toString().replaceFirst('Exception: ', '');
-        loading = false;
-      });
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      if (msg.contains('서버에 연결할 수 없습니다')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.red.withValues(alpha: 0.8),
+          ),
+        );
+        setState(() => loading = false);
+      } else {
+        setState(() {
+          errorMessage = msg;
+          loading = false;
+        });
+      }
     }
   }
 
@@ -117,6 +133,7 @@ class _LoginPageState extends State<LoginPage> {
                 icon: Icons.email_outlined,
                 hint: '이메일',
                 keyboardType: TextInputType.emailAddress,
+                errorText: emailError,
               ),
               const SizedBox(height: 10),
               _buildInputField(
@@ -124,6 +141,7 @@ class _LoginPageState extends State<LoginPage> {
                 icon: Icons.lock_outline,
                 hint: '비밀번호',
                 obscureText: true,
+                errorText: passwordError,
               ),
               const SizedBox(height: 18),
               SizedBox(
@@ -211,23 +229,35 @@ class _LoginPageState extends State<LoginPage> {
     required String hint,
     bool obscureText = false,
     TextInputType? keyboardType,
+    String? errorText,
   }) {
-    return TextField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: textMain, fontSize: 14),
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: textSub, size: 20),
-        hintText: hint,
-        hintStyle: const TextStyle(color: textSub, fontSize: 13),
-        filled: true,
-        fillColor: primary.withValues(alpha: 0.08),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary.withValues(alpha: 0.2))),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary.withValues(alpha: 0.2))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primary)),
-      ),
+    final hasError = errorText != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: controller,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          style: const TextStyle(color: textMain, fontSize: 14),
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, color: textSub, size: 20),
+            hintText: hint,
+            hintStyle: const TextStyle(color: textSub, fontSize: 13),
+            filled: true,
+            fillColor: primary.withValues(alpha: 0.08),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: hasError ? Colors.red : primary.withValues(alpha: 0.2))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: hasError ? Colors.red : primary.withValues(alpha: 0.2))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: hasError ? Colors.red : primary)),
+          ),
+        ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 12),
+            child: Text(errorText, style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
+          ),
+      ],
     );
   }
 
