@@ -1,1 +1,23 @@
 .superpowers/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+
+# Database
+*.db
+
+# Flutter
+rexx_app/.dart_tool/
+rexx_app/build/
+rexx_app/.flutter-plugins
+rexx_app/.flutter-plugins-dependencies
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
