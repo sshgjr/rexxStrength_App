@@ -34,6 +34,12 @@ Rexx Strength 앱의 로그인/회원가입 화면을 리디자인한다. 현재
 - 성공 시 JWT 토큰 저장 후 홈 화면 이동
 - "회원가입" 탭 시 회원가입 위저드 화면으로 전환
 
+### 에러 처리
+- 빈 필드 제출 시: 해당 입력 필드 테두리 빨간색 + 하단에 "이메일을 입력해주세요" / "비밀번호를 입력해주세요" 인라인 에러
+- 잘못된 이메일/비밀번호: 폼 상단에 "이메일 또는 비밀번호가 올바르지 않습니다" 에러 메시지 (빨간색 배경 박스)
+- 네트워크 오류: "서버에 연결할 수 없습니다. 네트워크를 확인해주세요." SnackBar 표시
+- 로딩 중: CTA 버튼에 CircularProgressIndicator 표시, 중복 제출 방지
+
 ## 2. 회원가입 위저드
 
 ### 공통
@@ -50,21 +56,27 @@ Rexx Strength 앱의 로그인/회원가입 화면을 리디자인한다. 현재
 - 비밀번호 (🔒 아이콘, 8자 이상)
 - 비밀번호 확인 (🔒 아이콘)
 
-**실시간 검증 칩:**
+**실시간 검증 칩 (클라이언트 전용, 서버는 별도 검증 없음):**
 - "8자 이상" — 충족 시 녹색 ✓
 - "영문+숫자" — 충족 시 녹색 ✓
 - "일치" — 비밀번호 확인 일치 시 녹색 ✓
 
-**CTA:** "다음 단계 →" (모든 검증 통과 시 활성화)
+**이메일 검증:** 이메일 형식 유효성도 실시간 체크 (@ 포함, 도메인 형식). 유효하지 않으면 필드 하단에 "올바른 이메일 형식을 입력해주세요" 인라인 에러.
+
+**CTA:** "다음 단계 →" (이메일 형식 유효 + 비밀번호 검증 모두 통과 시 활성화)
+
+**이메일 중복:** Step 1에서 "다음" 탭 시 이메일 중복 여부를 서버에서 확인하지 않음 (별도 API 미구현). 대신 Step 3에서 /register 호출 시 "이미 사용 중인 이메일입니다" 에러가 반환되면, Step 1으로 되돌아가면서 이메일 필드에 에러 표시.
 
 ### Step 2 — 프로필 설정
 **필드:**
-- 닉네임 (👤 아이콘)
-- 신장 (📏 아이콘, cm 단위) / 체중 (⚖️ 아이콘, kg 단위) — 가로 나란히 배치
+- 닉네임 (👤 아이콘) — 기존 백엔드의 `username` 필드에 매핑됨. 2~20자, 한글/영문/숫자 허용. Step 1에서 username을 별도 수집하지 않음. 중복 허용 (고유 제약 없음).
+- 신장 (📏 아이콘, cm 단위) / 체중 (⚖️ 아이콘, kg 단위) — 가로 나란히 배치, **선택 입력** (빈 값으로 다음 단계 진행 가능). 입력 시 범위 제한: 신장 50~300cm, 체중 20~500kg.
 - "🔒 신체 정보 비공개" 토글 스위치
   - 기본값: ON (비공개)
   - 설명 텍스트: "커뮤니티에서 다른 회원에게 숨깁니다"
 - 안내 박스: "ℹ️ 신체 정보는 자세 분석 피드백에 활용됩니다. 공개 설정은 마이페이지에서 변경 가능합니다."
+
+**검증:** 닉네임은 필수 (2~20자). 신장/체중은 선택. 닉네임 비어있으면 CTA 비활성.
 
 **CTA:** "다음 단계 →"
 
@@ -80,8 +92,10 @@ Rexx Strength 앱의 로그인/회원가입 화면을 리디자인한다. 현재
 | 수영 | 🏊 | "전신 운동의 왕, 수영! 균형 잡힌 체력을 가지고 계시겠네요!" |
 
 - 복수 선택 가능 (선택 시 녹색 테두리 + 글로우 효과)
-- 선택할 때마다 리액션 버블이 업데이트됨 (복수 선택 시 조합 메시지)
+- 리액션 버블 규칙: 단일 선택 시 해당 종목의 메시지 표시. 복수 선택 시 마지막 선택한 종목의 메시지를 표시하되, 앞에 "N개나 선택하셨네요! " 프리픽스 추가 (예: "2개나 선택하셨네요! 격투기 좋아하시는군요!...")
+- 아무것도 선택하지 않으면 리액션 버블 숨김, CTA 비활성
 - 프로덕션에서는 이모지 대신 실제 이미지(Unsplash 등)로 교체
+- 이 운동들은 관심 태그일 뿐, 현재 자세 분석은 3대 운동(스쿼트/벤치/데드리프트)만 지원
 
 **CTA:** "🎉 시작하기!" → 회원가입 API 호출 → 홈 화면 이동
 
@@ -106,14 +120,33 @@ Rexx Strength 앱의 로그인/회원가입 화면을 리디자인한다. 현재
 - `height`: Float, nullable (신장 cm)
 - `weight`: Float, nullable (체중 kg)
 - `is_body_public`: Boolean, default False (신체 정보 공개 여부)
-- `interests`: Text, nullable (관심 운동 JSON 배열, 예: `["powerlifting","bodyweight"]`)
+- `interests`: Text, nullable (관심 운동 JSON 배열)
+
+**interests 키 매핑:**
+| UI 레이블 | 저장 키 |
+|-----------|---------|
+| 3대 운동 | `powerlifting` |
+| 맨몸 운동 | `bodyweight` |
+| 유산소 | `cardio` |
+| 요가/필라테스 | `yoga` |
+| 격투기 | `martial_arts` |
+| 수영 | `swimming` |
+
+예: `["powerlifting","bodyweight"]`
 
 ### /register API 변경
-기존 요청 본문 (email, username, password)에 추가 필드 수용:
+기존 요청 본문 (email, password)에서 username → Step 2의 닉네임으로 수집. 추가 필드:
+- `username` (required, 닉네임)
 - `height` (optional)
 - `weight` (optional)
 - `is_body_public` (optional, default: false)
 - `interests` (optional, string array)
+
+### 응답 모델 변경
+`UserResponse` Pydantic 모델에 새 필드 추가 (height, weight, is_body_public, interests). `/login`, `/register`, `/me` 모든 인증 엔드포인트에서 반환.
+
+### DB 마이그레이션
+현재 `Base.metadata.create_all()`을 사용하므로, 기존 `test.db`를 삭제 후 재생성한다. (개발 단계이므로 Alembic 불필요)
 
 ## 5. 파일 구조 변경
 
@@ -125,13 +158,13 @@ rexx_app/lib/pages/signup/                  — 회원가입 위저드 디렉터
   step1_account.dart                        — Step 1 계정 정보
   step2_profile.dart                        — Step 2 프로필 설정
   step3_interests.dart                      — Step 3 관심 운동 선택
-docs/social-login-implementation-guide.md   — 소셜 로그인 구현 가이드
+docs/social-login-implementation-guide.md   — 소셜 로그인 구현 가이드 (OAuth 흐름, 필요 패키지, 백엔드 엔드포인트 설계 요약)
 ```
 
 ### 수정하는 파일
 ```
 rexx_server/auth.py                         — User 모델에 필드 추가
-rexx_server/main.py                         — /register 엔드포인트 수정
+rexx_server/main.py                         — /register 엔드포인트 + UserResponse 수정
 rexx_app/lib/services/auth_service.dart     — register() 메서드에 새 필드 추가
 rexx_app/lib/pages/home_screen.dart         — 로그인/회원가입 네비게이션 수정
 ```
