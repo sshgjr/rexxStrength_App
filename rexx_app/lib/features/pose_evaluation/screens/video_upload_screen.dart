@@ -3,10 +3,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
 import '../models/exercise_phase.dart';
-import '../models/evaluation_result.dart';
 import '../engine/pose_analyzer.dart';
 import '../../../services/pose_feedback_service.dart';
 import 'pose_result_screen.dart';
+import 'pose_debug_screen.dart';
 
 class VideoUploadScreen extends StatefulWidget {
   final ExerciseType exerciseType;
@@ -34,6 +34,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   bool _isAnalyzing = false;
   double _progress = 0.0;
   String _statusText = '';
+  bool _debugMode = false;
 
   @override
   void dispose() {
@@ -69,21 +70,74 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
     try {
       final analyzer = PoseAnalyzer();
 
+      void onProgress(double progress) {
+        setState(() {
+          _progress = progress;
+          if (progress < 0.3) {
+            _statusText = '프레임 추출 중...';
+          } else if (progress < 0.7) {
+            _statusText = '포즈 감지 중...';
+          } else {
+            _statusText = '점수 계산 중...';
+          }
+        });
+      }
+
+      // 디버그 모드: 프레임을 보존하고 디버그 화면으로 이동
+      if (_debugMode) {
+        final debugData = await analyzer.analyzeWithDebug(
+          videoPath: _videoPath!,
+          exerciseType: widget.exerciseType,
+          onProgress: onProgress,
+        );
+        analyzer.dispose();
+
+        if (!mounted) return;
+
+        // 디버그 화면 표시 (push로 열어 닫으면 돌아옴)
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PoseDebugScreen(debugData: debugData),
+          ),
+        );
+
+        if (!mounted) return;
+
+        // 디버그 화면 닫은 후 결과 화면으로 이동
+        final result = debugData.result;
+        setState(() {
+          _statusText = '피드백 생성 중...';
+        });
+
+        final feedbackService = PoseFeedbackService();
+        final feedbackResult = await feedbackService.requestFeedback(
+          result: result,
+          token: widget.token,
+        );
+
+        final finalResult = feedbackResult.isSuccess
+            ? result.copyWith(feedbackText: feedbackResult.feedback)
+            : result.copyWith(feedbackError: feedbackResult.error);
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PoseResultScreen(
+              result: finalResult,
+              token: widget.token,
+            ),
+          ),
+        );
+        return;
+      }
+
       final result = await analyzer.analyze(
         videoPath: _videoPath!,
         exerciseType: widget.exerciseType,
-        onProgress: (progress) {
-          setState(() {
-            _progress = progress;
-            if (progress < 0.3) {
-              _statusText = '프레임 추출 중...';
-            } else if (progress < 0.7) {
-              _statusText = '포즈 감지 중...';
-            } else {
-              _statusText = '점수 계산 중...';
-            }
-          });
-        },
+        onProgress: onProgress,
       );
 
       analyzer.dispose();
@@ -134,10 +188,65 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
       appBar: AppBar(
         backgroundColor: bg,
         foregroundColor: textMain,
-        title: Text(
-          '${widget.exerciseType.displayName} 영상 업로드',
-          style: const TextStyle(fontWeight: FontWeight.w800),
+        title: GestureDetector(
+          onLongPress: () {
+                  setState(() => _debugMode = !_debugMode);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _debugMode ? '디버그 모드 활성화' : '디버그 모드 비활성화',
+                      ),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${widget.exerciseType.displayName} 영상 업로드',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              if (_debugMode) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF5350),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'DEBUG',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
+        actions: [
+          IconButton(
+              onPressed: () {
+                setState(() => _debugMode = !_debugMode);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      _debugMode ? '디버그 모드 활성화' : '디버그 모드 비활성화',
+                    ),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              },
+              icon: Icon(
+                _debugMode ? Icons.bug_report : Icons.bug_report_outlined,
+                color: _debugMode ? const Color(0xFFEF5350) : textSub,
+              ),
+              tooltip: '디버그 모드',
+            ),
+        ],
         elevation: 0,
       ),
       body: Padding(

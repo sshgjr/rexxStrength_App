@@ -5,6 +5,7 @@ import 'package:video_player/video_player.dart';
 import '../models/pose_frame.dart';
 import '../models/exercise_phase.dart';
 import '../models/evaluation_result.dart';
+import '../models/debug_analysis_data.dart';
 import 'rules/exercise_rule.dart';
 import 'rules/squat_rules.dart';
 import 'rules/bench_press_rules.dart';
@@ -83,6 +84,57 @@ class PoseAnalyzer {
       criteria: criteria,
       detectedIssues: issues,
       evaluatedAt: DateTime.now(),
+    );
+  }
+
+  /// 디버그용 분석 — 프레임 이미지를 삭제하지 않고 반환
+  Future<DebugAnalysisData> analyzeWithDebug({
+    required String videoPath,
+    required ExerciseType exerciseType,
+    void Function(double progress)? onProgress,
+  }) async {
+    onProgress?.call(0.0);
+
+    final frames = await _extractFrames(videoPath);
+    onProgress?.call(0.3);
+
+    final List<PoseFrame> poseFrames;
+    if (isSimulatorMode) {
+      poseFrames = await _stub!.detectPoses(frames);
+    } else {
+      poseFrames = await _detectPoses(frames);
+    }
+    onProgress?.call(0.7);
+
+    final rule = _getRule(exerciseType);
+    final criteria = rule.evaluate(poseFrames);
+
+    double totalScore = 0;
+    for (final c in criteria) {
+      totalScore += c.score * c.weight;
+    }
+
+    final issues = criteria
+        .where((c) => c.grade != CriterionGrade.good)
+        .map((c) =>
+            '${c.description}: ${c.grade.displayName} (${c.score.round()}점)')
+        .toList();
+
+    onProgress?.call(1.0);
+
+    // _cleanup 생략 — 프레임 경로를 디버그 화면에서 사용
+    final result = EvaluationResult(
+      exerciseType: exerciseType,
+      totalScore: totalScore.round(),
+      criteria: criteria,
+      detectedIssues: issues,
+      evaluatedAt: DateTime.now(),
+    );
+
+    return DebugAnalysisData(
+      framePaths: frames,
+      poseFrames: poseFrames,
+      result: result,
     );
   }
 
