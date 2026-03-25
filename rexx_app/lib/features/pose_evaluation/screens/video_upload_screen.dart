@@ -3,18 +3,20 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
 import '../models/exercise_phase.dart';
+import '../models/classification_result.dart';
 import '../engine/pose_analyzer.dart';
+import '../widgets/classification_dialogs.dart';
 import '../../../services/pose_feedback_service.dart';
 import 'pose_result_screen.dart';
 import 'pose_debug_screen.dart';
 
 class VideoUploadScreen extends StatefulWidget {
-  final ExerciseType exerciseType;
+  final ExerciseType? exerciseType;  // null이면 자동 분류
   final String? token;
 
   const VideoUploadScreen({
     super.key,
-    required this.exerciseType,
+    this.exerciseType,
     this.token,
   });
 
@@ -83,11 +85,42 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
         });
       }
 
+      // 분류 필요 시 사용자에게 다이얼로그 표시하는 콜백
+      Future<ExerciseType> onClassificationNeeded(ClassificationResult classification) async {
+        ExerciseType? selected;
+
+        if (classification.confidence == ClassificationConfidence.ambiguous) {
+          selected = await showAmbiguousDialog(context, classification);
+        } else {
+          // failed
+          selected = await showClassificationFailedDialog(context, classification);
+        }
+
+        if (selected == null) {
+          throw _ClassificationCancelledException();
+        }
+        return selected;
+      }
+
+      // moderate 자동 확정 시 토스트 표시
+      void onAutoClassified(ExerciseType type) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${type.displayName}(으)로 분석합니다'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+
       // 디버그 모드: 프레임을 보존하고 디버그 화면으로 이동
       if (_debugMode) {
         final debugData = await analyzer.analyzeWithDebug(
           videoPath: _videoPath!,
           exerciseType: widget.exerciseType,
+          onClassificationNeeded: widget.exerciseType == null ? onClassificationNeeded : null,
+          onAutoClassified: widget.exerciseType == null ? onAutoClassified : null,
           onProgress: onProgress,
         );
         analyzer.dispose();
@@ -137,6 +170,8 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
       final result = await analyzer.analyze(
         videoPath: _videoPath!,
         exerciseType: widget.exerciseType,
+        onClassificationNeeded: widget.exerciseType == null ? onClassificationNeeded : null,
+        onAutoClassified: widget.exerciseType == null ? onAutoClassified : null,
         onProgress: onProgress,
       );
 
@@ -168,6 +203,12 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
           ),
         ),
       );
+    } on _ClassificationCancelledException {
+      setState(() {
+        _isAnalyzing = false;
+        _statusText = '';
+      });
+      return; // 네비게이션은 다이얼로그에서 이미 처리됨
     } catch (e) {
       setState(() {
         _isAnalyzing = false;
@@ -204,7 +245,9 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '${widget.exerciseType.displayName} 영상 업로드',
+                widget.exerciseType != null
+                    ? '${widget.exerciseType!.displayName} 영상 업로드'
+                    : '영상 분석',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               if (_debugMode) ...[
@@ -486,3 +529,5 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
     );
   }
 }
+
+class _ClassificationCancelledException implements Exception {}

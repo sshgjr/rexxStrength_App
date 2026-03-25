@@ -11,6 +11,8 @@ import 'rules/squat_rules.dart';
 import 'rules/bench_press_rules.dart';
 import 'rules/deadlift_rules.dart';
 import 'pose_detector_stub.dart';
+import 'classifier/exercise_classifier.dart';
+import '../models/classification_result.dart';
 
 /// 시뮬레이터 모드 여부 (빌드 시 --dart-define=SIMULATOR_MODE=true 로 설정)
 const bool isSimulatorMode =
@@ -34,11 +36,16 @@ class PoseAnalyzer {
     }
   }
 
-  /// 영상 파일에서 프레임 추출 → 포즈 분석 → 규칙 평가
+  /// 영상 파일에서 프레임 추출 → 포즈 분석 → (자동 분류) → 규칙 평가
+  /// [exerciseType]이 null이면 자동 분류 수행
+  /// [onClassificationNeeded] 분류 confidence가 낮을 때 사용자 선택을 요청하는 콜백
+  /// [onAutoClassified] moderate 확정 시 호출 (토스트 표시용)
   /// [onProgress] 콜백: 0.0 ~ 1.0
   Future<EvaluationResult> analyze({
     required String videoPath,
-    required ExerciseType exerciseType,
+    ExerciseType? exerciseType,
+    Future<ExerciseType> Function(ClassificationResult)? onClassificationNeeded,
+    void Function(ExerciseType)? onAutoClassified,
     void Function(double progress)? onProgress,
   }) async {
     onProgress?.call(0.0);
@@ -56,8 +63,28 @@ class PoseAnalyzer {
     }
     onProgress?.call(0.7);
 
+    // 2.5. 운동 종류 결정
+    final ExerciseType resolvedType;
+    if (exerciseType != null) {
+      resolvedType = exerciseType;
+    } else {
+      final classifier = ExerciseClassifier();
+      final classification = classifier.classify(poseFrames);
+
+      if (classification.confidence == ClassificationConfidence.high) {
+        resolvedType = classification.bestMatch;
+      } else if (classification.confidence == ClassificationConfidence.moderate) {
+        resolvedType = classification.bestMatch;
+        onAutoClassified?.call(resolvedType);
+      } else if (onClassificationNeeded != null) {
+        resolvedType = await onClassificationNeeded(classification);
+      } else {
+        resolvedType = classification.bestMatch;
+      }
+    }
+
     // 3. 규칙 기반 평가
-    final rule = _getRule(exerciseType);
+    final rule = _getRule(resolvedType);
     final criteria = rule.evaluate(poseFrames);
 
     // 4. 총점 계산 (가중 평균)
@@ -79,7 +106,7 @@ class PoseAnalyzer {
     await _cleanup(frames);
 
     return EvaluationResult(
-      exerciseType: exerciseType,
+      exerciseType: resolvedType,
       totalScore: totalScore.round(),
       criteria: criteria,
       detectedIssues: issues,
@@ -90,7 +117,9 @@ class PoseAnalyzer {
   /// 디버그용 분석 — 프레임 이미지를 삭제하지 않고 반환
   Future<DebugAnalysisData> analyzeWithDebug({
     required String videoPath,
-    required ExerciseType exerciseType,
+    ExerciseType? exerciseType,
+    Future<ExerciseType> Function(ClassificationResult)? onClassificationNeeded,
+    void Function(ExerciseType)? onAutoClassified,
     void Function(double progress)? onProgress,
   }) async {
     onProgress?.call(0.0);
@@ -106,7 +135,27 @@ class PoseAnalyzer {
     }
     onProgress?.call(0.7);
 
-    final rule = _getRule(exerciseType);
+    // 운동 종류 결정 (analyze()와 동일 로직)
+    final ExerciseType resolvedType;
+    if (exerciseType != null) {
+      resolvedType = exerciseType;
+    } else {
+      final classifier = ExerciseClassifier();
+      final classification = classifier.classify(poseFrames);
+
+      if (classification.confidence == ClassificationConfidence.high) {
+        resolvedType = classification.bestMatch;
+      } else if (classification.confidence == ClassificationConfidence.moderate) {
+        resolvedType = classification.bestMatch;
+        onAutoClassified?.call(resolvedType);
+      } else if (onClassificationNeeded != null) {
+        resolvedType = await onClassificationNeeded(classification);
+      } else {
+        resolvedType = classification.bestMatch;
+      }
+    }
+
+    final rule = _getRule(resolvedType);
     final criteria = rule.evaluate(poseFrames);
 
     double totalScore = 0;
@@ -124,7 +173,7 @@ class PoseAnalyzer {
 
     // _cleanup 생략 — 프레임 경로를 디버그 화면에서 사용
     final result = EvaluationResult(
-      exerciseType: exerciseType,
+      exerciseType: resolvedType,
       totalScore: totalScore.round(),
       criteria: criteria,
       detectedIssues: issues,
