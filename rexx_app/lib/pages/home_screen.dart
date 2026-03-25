@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'login_page.dart';
 import 'member_page.dart';
 import 'waiting_screen.dart';
+import 'one_rm_page.dart';
 import '../features/pose_evaluation/screens/exercise_select_screen.dart';
 
 class RexxHomeScreen extends StatefulWidget {
@@ -69,9 +70,9 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
     }
 
     // 상태 변화 리스닝
-    _connectivitySubscription = Connectivity()
-        .onConnectivityChanged
-        .listen((List<ConnectivityResult> results) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
       final online = results.any((r) => r != ConnectivityResult.none);
       if (!mounted) return;
 
@@ -134,11 +135,7 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
         ),
         content: const Text(
           '현재 기기가 오프라인 상태입니다.\n오프라인 모드로 진행할까요?',
-          style: TextStyle(
-            color: textSub,
-            fontSize: 15,
-            height: 1.5,
-          ),
+          style: TextStyle(color: textSub, fontSize: 15, height: 1.5),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         actionsAlignment: MainAxisAlignment.center,
@@ -154,9 +151,7 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.12),
-                      ),
+                      border: Border.all(color: Colors.white.withOpacity(0.12)),
                     ),
                     alignment: Alignment.center,
                     child: const Text(
@@ -392,17 +387,22 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
 
   void _onMenuTap(int index) async {
     final item = menuItems[index];
+
+    /// ✅ 1RM 계산기 이동 추가
+    if (item == '1RM 계산') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const OneRMPage()),
+      );
+      return;
+    }
+
     if (item == '자세 평가') {
       final result = await Navigator.push<Map<String, dynamic>>(
         context,
-        MaterialPageRoute(
-          builder: (_) => ExerciseSelectScreen(
-            token: token,
-          ),
-        ),
+        MaterialPageRoute(builder: (_) => ExerciseSelectScreen(token: token)),
       );
 
-      // 게스트가 회원가입 후 돌아온 경우 로그인 상태 업데이트
       if (result != null && mounted) {
         setState(() {
           isLoggedIn = true;
@@ -413,6 +413,8 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
       }
     }
   }
+
+  // 게스트가 회원가입 후 돌아온 경우 로그인 상태 업데이트
 
   Future<void> _handleLoginButton() async {
     if (isLoggedIn) {
@@ -716,21 +718,31 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
                     runSpacing: 12,
                     alignment: WrapAlignment.center,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          '1RM 측정하기',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const OneRMPage(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            '1RM 측정하기',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
