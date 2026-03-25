@@ -61,24 +61,9 @@ class PoseAnalyzer {
     onProgress?.call(0.7);
 
     // 2.5. 운동 종류 결정
-    final ExerciseType resolvedType;
-    if (exerciseType != null) {
-      resolvedType = exerciseType;
-    } else {
-      final classifier = ExerciseClassifier();
-      final classification = classifier.classify(poseFrames);
-
-      if (classification.confidence == ClassificationConfidence.high) {
-        resolvedType = classification.bestMatch;
-      } else if (classification.confidence == ClassificationConfidence.moderate) {
-        resolvedType = classification.bestMatch;
-        onAutoClassified?.call(resolvedType);
-      } else if (onClassificationNeeded != null) {
-        resolvedType = await onClassificationNeeded(classification);
-      } else {
-        resolvedType = classification.bestMatch;
-      }
-    }
+    final resolvedType = await _resolveExerciseType(
+      poseFrames, exerciseType, onClassificationNeeded, onAutoClassified,
+    );
 
     // 3. 규칙 기반 평가
     final rule = _getRule(resolvedType);
@@ -132,25 +117,9 @@ class PoseAnalyzer {
     }
     onProgress?.call(0.7);
 
-    // 운동 종류 결정 (analyze()와 동일 로직)
-    final ExerciseType resolvedType;
-    if (exerciseType != null) {
-      resolvedType = exerciseType;
-    } else {
-      final classifier = ExerciseClassifier();
-      final classification = classifier.classify(poseFrames);
-
-      if (classification.confidence == ClassificationConfidence.high) {
-        resolvedType = classification.bestMatch;
-      } else if (classification.confidence == ClassificationConfidence.moderate) {
-        resolvedType = classification.bestMatch;
-        onAutoClassified?.call(resolvedType);
-      } else if (onClassificationNeeded != null) {
-        resolvedType = await onClassificationNeeded(classification);
-      } else {
-        resolvedType = classification.bestMatch;
-      }
-    }
+    final resolvedType = await _resolveExerciseType(
+      poseFrames, exerciseType, onClassificationNeeded, onAutoClassified,
+    );
 
     final rule = _getRule(resolvedType);
     final criteria = rule.evaluate(poseFrames);
@@ -181,6 +150,30 @@ class PoseAnalyzer {
       poseFrames: poseFrames,
       result: result,
     );
+  }
+
+  /// 운동 종류 결정: 명시적 지정 또는 자동 분류
+  Future<ExerciseType> _resolveExerciseType(
+    List<PoseFrame> poseFrames,
+    ExerciseType? exerciseType,
+    Future<ExerciseType> Function(ClassificationResult)? onClassificationNeeded,
+    void Function(ExerciseType)? onAutoClassified,
+  ) async {
+    if (exerciseType != null) return exerciseType;
+
+    final classifier = ExerciseClassifier();
+    final classification = classifier.classify(poseFrames);
+
+    if (classification.confidence == ClassificationConfidence.high) {
+      return classification.bestMatch;
+    } else if (classification.confidence == ClassificationConfidence.moderate) {
+      onAutoClassified?.call(classification.bestMatch);
+      return classification.bestMatch;
+    } else if (onClassificationNeeded != null) {
+      return await onClassificationNeeded(classification);
+    } else {
+      return classification.bestMatch;
+    }
   }
 
   /// video_thumbnail로 5FPS JPEG 프레임 추출

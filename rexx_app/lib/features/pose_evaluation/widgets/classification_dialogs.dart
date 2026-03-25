@@ -200,14 +200,18 @@ Future<void> _showUnsupportedExerciseFeedback(BuildContext context) async {
         TextButton(
           onPressed: () {
             Navigator.pop(ctx);
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            if (context.mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
           },
           child: const Text('메인으로 돌아가기', style: TextStyle(color: _textSub)),
         ),
         ElevatedButton(
           onPressed: () {
             Navigator.pop(ctx);
-            Navigator.pop(context);
+            if (context.mounted) {
+              Navigator.pop(context);
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: _primary,
