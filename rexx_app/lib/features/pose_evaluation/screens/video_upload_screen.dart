@@ -3,9 +3,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
 import '../models/exercise_phase.dart';
-import '../models/classification_result.dart';
+// import '../models/classification_result.dart';  // [자동 분류 주석 처리]
 import '../engine/pose_analyzer.dart';
-import '../widgets/classification_dialogs.dart';
+// import '../widgets/classification_dialogs.dart';  // [자동 분류 주석 처리]
 import '../../../services/pose_feedback_service.dart';
 import 'pose_result_screen.dart';
 import 'pose_debug_screen.dart';
@@ -37,6 +37,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   double _progress = 0.0;
   String _statusText = '';
   bool _debugMode = false;
+  ExerciseType? _selectedExerciseType;
 
   @override
   void dispose() {
@@ -52,16 +53,110 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
 
     setState(() {
       _videoPath = video.path;
+      _selectedExerciseType = null;
     });
 
     _videoController?.dispose();
     _videoController = VideoPlayerController.file(File(video.path));
     await _videoController!.initialize();
     setState(() {});
+
+    // 영상 선택 후 운동 종류 선택 바텀시트 표시
+    if (mounted) {
+      _showExercisePickerBottomSheet();
+    }
+  }
+
+  void _showExercisePickerBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F1612),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(
+                  child: Text(
+                    '운동 종류를 선택하세요',
+                    style: TextStyle(
+                      color: Color(0xFFE9F5EF),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...ExerciseType.values.map((type) {
+                  final icons = {
+                    ExerciseType.squat: Icons.fitness_center,
+                    ExerciseType.benchPress: Icons.airline_seat_flat,
+                    ExerciseType.deadlift: Icons.height,
+                    ExerciseType.wristCurl: Icons.front_hand,
+                  };
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          icons[type] ?? Icons.fitness_center,
+                          color: primary,
+                          size: 22,
+                        ),
+                      ),
+                      title: Text(
+                        type.displayName,
+                        style: const TextStyle(
+                          color: Color(0xFFE9F5EF),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      tileColor: Colors.white.withValues(alpha: 0.05),
+                      onTap: () {
+                        Navigator.pop(context, type);
+                      },
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    ).then((selected) {
+      if (selected != null && selected is ExerciseType) {
+        setState(() {
+          _selectedExerciseType = selected;
+        });
+      }
+    });
   }
 
   Future<void> _startAnalysis() async {
     if (_videoPath == null) return;
+
+    // 운동 종류가 선택되지 않았으면 바텀시트 표시
+    final exerciseType = widget.exerciseType ?? _selectedExerciseType;
+    if (exerciseType == null) {
+      _showExercisePickerBottomSheet();
+      return;
+    }
 
     setState(() {
       _isAnalyzing = true;
@@ -85,42 +180,36 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
         });
       }
 
-      // 분류 필요 시 사용자에게 다이얼로그 표시하는 콜백
-      Future<ExerciseType> onClassificationNeeded(ClassificationResult classification) async {
-        ExerciseType? selected;
-
-        if (classification.confidence == ClassificationConfidence.ambiguous) {
-          selected = await showAmbiguousDialog(context, classification);
-        } else {
-          // failed
-          selected = await showClassificationFailedDialog(context, classification);
-        }
-
-        if (selected == null) {
-          throw _ClassificationCancelledException();
-        }
-        return selected;
-      }
-
-      // moderate 자동 확정 시 토스트 표시
-      void onAutoClassified(ExerciseType type) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${type.displayName}(으)로 분석합니다'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      }
+      // [자동 분류 주석 처리] 사용자가 직접 운동 종류를 선택하므로 자동 분류 비활성화
+      // Future<ExerciseType> onClassificationNeeded(ClassificationResult classification) async {
+      //   ExerciseType? selected;
+      //   if (classification.confidence == ClassificationConfidence.ambiguous) {
+      //     selected = await showAmbiguousDialog(context, classification);
+      //   } else {
+      //     selected = await showClassificationFailedDialog(context, classification);
+      //   }
+      //   if (selected == null) {
+      //     throw _ClassificationCancelledException();
+      //   }
+      //   return selected;
+      // }
+      //
+      // void onAutoClassified(ExerciseType type) {
+      //   if (mounted) {
+      //     ScaffoldMessenger.of(context).showSnackBar(
+      //       SnackBar(
+      //         content: Text('${type.displayName}(으)로 분석합니다'),
+      //         duration: const Duration(seconds: 2),
+      //       ),
+      //     );
+      //   }
+      // }
 
       // 디버그 모드: 프레임을 보존하고 디버그 화면으로 이동
       if (_debugMode) {
         final debugData = await analyzer.analyzeWithDebug(
           videoPath: _videoPath!,
-          exerciseType: widget.exerciseType,
-          onClassificationNeeded: widget.exerciseType == null ? onClassificationNeeded : null,
-          onAutoClassified: widget.exerciseType == null ? onAutoClassified : null,
+          exerciseType: exerciseType,
           onProgress: onProgress,
         );
         analyzer.dispose();
@@ -169,9 +258,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
 
       final result = await analyzer.analyze(
         videoPath: _videoPath!,
-        exerciseType: widget.exerciseType,
-        onClassificationNeeded: widget.exerciseType == null ? onClassificationNeeded : null,
-        onAutoClassified: widget.exerciseType == null ? onAutoClassified : null,
+        exerciseType: exerciseType,
         onProgress: onProgress,
       );
 
@@ -245,8 +332,8 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                widget.exerciseType != null
-                    ? '${widget.exerciseType!.displayName} 영상 업로드'
+                (widget.exerciseType ?? _selectedExerciseType) != null
+                    ? '${(widget.exerciseType ?? _selectedExerciseType)!.displayName} 영상 분석'
                     : '영상 분석',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
@@ -487,6 +574,78 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
             ),
           )
         else ...[
+          // 선택된 운동 종류 표시 및 변경 버튼
+          if (_selectedExerciseType != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GestureDetector(
+                onTap: _showExercisePickerBottomSheet,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        _selectedExerciseType!.displayName,
+                        style: const TextStyle(
+                          color: textMain,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '변경',
+                        style: TextStyle(
+                          color: primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (_videoPath != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GestureDetector(
+                onTap: _showExercisePickerBottomSheet,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.touch_app, color: textSub, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        '운동 종류를 선택하세요',
+                        style: TextStyle(
+                          color: textSub,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           SizedBox(
             width: double.infinity,
             height: 56,
@@ -513,7 +672,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
               onPressed: _pickVideo,
               style: OutlinedButton.styleFrom(
                 foregroundColor: textSub,
-                side: BorderSide(color: Colors.white.withOpacity(0.15)),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),

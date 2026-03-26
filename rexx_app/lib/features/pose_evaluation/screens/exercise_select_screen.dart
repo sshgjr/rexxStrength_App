@@ -45,73 +45,21 @@ class ExerciseSelectScreen extends StatelessWidget {
               style: TextStyle(color: textSub, fontSize: 14),
             ),
             const SizedBox(height: 24),
-            // 자동 분석 버튼
-            _buildAutoAnalyzeButton(context),
-            const SizedBox(height: 32),
-            // 구분선 + 안내 문구
-            Row(
-              children: [
-                Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    '또는',
-                    style: TextStyle(color: textSub, fontSize: 13),
-                  ),
-                ),
-                Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Center(
-              child: Text(
-                '더 빠른 분석을 원하시면 직접 선택하세요',
-                style: TextStyle(color: textSub, fontSize: 13),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // 기존 3개 운동 카드
-            _buildExerciseCard(
-              context,
-              exerciseType: ExerciseType.squat,
-              icon: Icons.fitness_center,
-              description: '하체 근력의 기본, 올바른 깊이와 자세를 확인하세요.',
-            ),
-            const SizedBox(height: 12),
-            _buildExerciseCard(
-              context,
-              exerciseType: ExerciseType.benchPress,
-              icon: Icons.airline_seat_flat,
-              description: '상체 푸시의 핵심, 팔꿈치 각도와 바 경로를 분석합니다.',
-            ),
-            const SizedBox(height: 12),
-            _buildExerciseCard(
-              context,
-              exerciseType: ExerciseType.deadlift,
-              icon: Icons.height,
-              description: '후면 사슬 강화, 힙 힌지와 등 각도를 평가합니다.',
-            ),
-            const SizedBox(height: 12),
-            _buildExerciseCard(
-              context,
-              exerciseType: ExerciseType.wristCurl,
-              icon: Icons.front_hand,
-              description: '전완 강화, 손목 가동범위와 팔꿈치 고정을 분석합니다.',
-            ),
+            // 분석하기 버튼
+            _buildAnalyzeButton(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAutoAnalyzeButton(BuildContext context) {
+  Widget _buildAnalyzeButton(BuildContext context) {
     return GestureDetector(
       onTap: () async {
         final result = await Navigator.push<Map<String, dynamic>>(
           context,
           MaterialPageRoute(
             builder: (_) => VideoUploadScreen(token: token),
-            // exerciseType 생략 → null → 자동 분류
           ),
         );
         if (result != null && context.mounted) {
@@ -138,10 +86,10 @@ class ExerciseSelectScreen extends StatelessWidget {
         ),
         child: const Column(
           children: [
-            Icon(Icons.auto_awesome, color: Colors.white, size: 36),
+            Icon(Icons.analytics_outlined, color: Colors.white, size: 36),
             SizedBox(height: 12),
             Text(
-              '영상으로 자동 분석',
+              '분석하기',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -150,84 +98,12 @@ class ExerciseSelectScreen extends StatelessWidget {
             ),
             SizedBox(height: 6),
             Text(
-              '영상을 업로드하면 운동 종류를 자동으로 판별합니다',
+              '운동 영상을 업로드하고 자세를 분석합니다',
               style: TextStyle(
                 color: Colors.white70,
                 fontSize: 13,
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExerciseCard(
-    BuildContext context, {
-    required ExerciseType exerciseType,
-    required IconData icon,
-    required String description,
-  }) {
-    return GestureDetector(
-      onTap: () async {
-        final result = await Navigator.push<Map<String, dynamic>>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VideoUploadScreen(
-              exerciseType: exerciseType,
-              token: token,
-            ),
-          ),
-        );
-        if (result != null && context.mounted) {
-          Navigator.pop(context, result);
-        }
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: primary, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    exerciseType.displayName,
-                    style: const TextStyle(
-                      color: textMain,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      color: textSub,
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: textSub, size: 22),
           ],
         ),
       ),

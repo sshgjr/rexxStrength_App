@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../services/pose_feedback_service.dart';
 
-/// LLM 피드백 카드 위젯
+/// AI 코칭 피드백 카드 위젯 (구조화된 JSON 응답 표시)
 class FeedbackCard extends StatelessWidget {
   final String? feedbackText;
   final String offlineFeedback;
@@ -19,10 +20,160 @@ class FeedbackCard extends StatelessWidget {
   static const Color textMain = Color(0xFFE9F5EF);
   static const Color textSub = Color(0xFFA7B9B0);
 
+  /// feedbackText를 JSON으로 파싱 시도
+  Map<String, dynamic>? _parseFeedback() {
+    if (feedbackText == null) return null;
+    try {
+      final parsed = jsonDecode(feedbackText!);
+      if (parsed is Map<String, dynamic> && parsed.containsKey('summary')) {
+        return parsed;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final displayText = feedbackText ?? offlineFeedback;
+    final parsed = _parseFeedback();
     final isOnline = feedbackText != null;
+
+    // 구조화된 JSON 피드백인 경우
+    if (parsed != null) {
+      return _buildStructuredFeedback(parsed);
+    }
+
+    // 일반 텍스트 피드백 (fallback)
+    return _buildPlainFeedback(isOnline);
+  }
+
+  Widget _buildStructuredFeedback(Map<String, dynamic> data) {
+    final summary = data['summary'] as String? ?? '';
+    final reason = data['reason'] as String? ?? '';
+    final action = data['action'] as String? ?? '';
+    final cue = data['cue'] as String? ?? '';
+
+    return Column(
+      children: [
+        // 큐 (한줄 요약) - 상단에 크게 표시
+        if (cue.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [primary, primary.withValues(alpha: 0.8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: primary.withValues(alpha: 0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.format_quote, color: Colors.white70, size: 28),
+                const SizedBox(height: 8),
+                Text(
+                  cue,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 16),
+
+        // 요약
+        if (summary.isNotEmpty)
+          _buildSection(
+            icon: Icons.summarize_outlined,
+            title: '요약',
+            content: summary,
+          ),
+        if (summary.isNotEmpty) const SizedBox(height: 12),
+
+        // 원인
+        if (reason.isNotEmpty)
+          _buildSection(
+            icon: Icons.search,
+            title: '원인',
+            content: reason,
+          ),
+        if (reason.isNotEmpty) const SizedBox(height: 12),
+
+        // 실행 방법
+        if (action.isNotEmpty)
+          _buildSection(
+            icon: Icons.directions_run,
+            title: '이렇게 해보세요',
+            content: action,
+            highlight: true,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSection({
+    required IconData icon,
+    required String title,
+    required String content,
+    bool highlight = false,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: highlight ? primary.withValues(alpha: 0.08) : card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: highlight
+              ? primary.withValues(alpha: 0.25)
+              : Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: highlight ? primary : textSub, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  color: highlight ? primary : textSub,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            content,
+            style: const TextStyle(
+              color: textMain,
+              fontSize: 16,
+              height: 1.7,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlainFeedback(bool isOnline) {
+    final displayText = feedbackText ?? offlineFeedback;
 
     return Container(
       width: double.infinity,

@@ -19,7 +19,7 @@ from schemas.pose_schemas import (
     PoseHistoryItem,
 )
 from models.pose_models import PoseEvaluation
-from services.haiku_service import generate_feedback
+from services.gemini_service import generate_feedback
 
 # 테이블 생성
 Base.metadata.create_all(bind=engine)
