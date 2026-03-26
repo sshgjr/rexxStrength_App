@@ -11,7 +11,8 @@ enum ExercisePhase {
 enum ExerciseType {
   squat,
   benchPress,
-  deadlift;
+  deadlift,
+  wristCurl;
 
   String get displayName {
     switch (this) {
@@ -21,6 +22,8 @@ enum ExerciseType {
         return '벤치프레스';
       case ExerciseType.deadlift:
         return '데드리프트';
+      case ExerciseType.wristCurl:
+        return '리스트컬';
     }
   }
 
@@ -32,6 +35,8 @@ enum ExerciseType {
         return 'bench_press';
       case ExerciseType.deadlift:
         return 'deadlift';
+      case ExerciseType.wristCurl:
+        return 'wrist_curl';
     }
   }
 }

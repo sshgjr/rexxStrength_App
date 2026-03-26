@@ -98,5 +98,13 @@ void main() {
       expect(ExerciseType.benchPress.apiName, 'bench_press');
       expect(ExerciseType.deadlift.apiName, 'deadlift');
     });
+
+    test('wristCurl displayName은 리스트컬', () {
+      expect(ExerciseType.wristCurl.displayName, '리스트컬');
+    });
+
+    test('wristCurl apiName은 wrist_curl', () {
+      expect(ExerciseType.wristCurl.apiName, 'wrist_curl');
+    });
   });
 }

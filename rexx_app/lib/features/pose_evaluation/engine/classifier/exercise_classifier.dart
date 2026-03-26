@@ -15,10 +15,9 @@ class ExerciseClassifier {
   ClassificationResult classify(List<PoseFrame> frames) {
     if (frames.length < 5) {
       // 프레임 부족 시 균등 확률 (스펙 섹션 8: < 5프레임이면 에러)
+      final count = ExerciseType.values.length;
       return ClassificationResult(probabilities: {
-        ExerciseType.squat: 1.0 / 3,
-        ExerciseType.benchPress: 1.0 / 3,
-        ExerciseType.deadlift: 1.0 / 3,
+        for (final type in ExerciseType.values) type: 1.0 / count,
       });
     }
 
@@ -46,8 +45,9 @@ class ExerciseClassifier {
         probabilities[entry.key] = entry.value / totalScore;
       }
     } else {
+      final count = ExerciseType.values.length;
       for (final type in ExerciseType.values) {
-        probabilities[type] = 1.0 / 3;
+        probabilities[type] = 1.0 / count;
       }
     }
 
@@ -206,6 +206,8 @@ class ExerciseClassifier {
         return AngleCalculator.rangeScore(roms['elbow']!, idealMin: 50, idealMax: 110, tolerance: 30);
       case ExerciseType.deadlift:
         return AngleCalculator.rangeScore(roms['hip']!, idealMin: 50, idealMax: 100, tolerance: 30);
+      case ExerciseType.wristCurl:
+        return AngleCalculator.rangeScore(roms['wrist'] ?? 0, idealMin: 20, idealMax: 60, tolerance: 20);
     }
   }
 
@@ -218,6 +220,8 @@ class ExerciseClassifier {
         return AngleCalculator.rangeScore(ratio, idealMin: 0.60, idealMax: 0.90, tolerance: 0.20);
       case ExerciseType.deadlift:
         return AngleCalculator.rangeScore(ratio, idealMin: 0.35, idealMax: 0.60, tolerance: 0.20);
+      case ExerciseType.wristCurl:
+        return AngleCalculator.rangeScore(ratio, idealMin: 0.70, idealMax: 0.95, tolerance: 0.20);
     }
   }
 
@@ -230,6 +234,8 @@ class ExerciseClassifier {
         return AngleCalculator.rangeScore(avgAngle, idealMin: 70, idealMax: 90, tolerance: 20);
       case ExerciseType.deadlift:
         return AngleCalculator.rangeScore(avgAngle, idealMin: 30, idealMax: 55, tolerance: 20);
+      case ExerciseType.wristCurl:
+        return AngleCalculator.rangeScore(avgAngle, idealMin: 10, idealMax: 40, tolerance: 20);
     }
   }
 }

@@ -10,6 +10,7 @@ import 'rules/exercise_rule.dart';
 import 'rules/squat_rules.dart';
 import 'rules/bench_press_rules.dart';
 import 'rules/deadlift_rules.dart';
+import 'rules/wrist_curl_rules.dart';
 import 'pose_detector_stub.dart';
 import 'classifier/exercise_classifier.dart';
 import '../models/classification_result.dart';
@@ -271,6 +272,8 @@ class PoseAnalyzer {
         return BenchPressRules();
       case ExerciseType.deadlift:
         return DeadliftRules();
+      case ExerciseType.wristCurl:
+        return WristCurlRules();
     }
   }
 
