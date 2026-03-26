@@ -149,6 +149,54 @@ class PhaseDetector {
     return phases;
   }
 
+  /// 리스트컬 단계 감지: 손목 각도 기반 (elbow→wrist→index)
+  static List<MapEntry<ExercisePhase, int>> detectWristCurlPhases(List<PoseFrame> frames) {
+    final phases = <MapEntry<ExercisePhase, int>>[];
+    final wristAngles = <double>[];
+
+    for (final frame in frames) {
+      final elbow = frame.getLandmark(PoseFrame.leftElbow);
+      final wrist = frame.getLandmark(PoseFrame.leftWrist);
+      final index = frame.getLandmark(PoseFrame.leftIndex);
+
+      if (elbow == null || wrist == null || index == null || index.likelihood < 0.5) {
+        wristAngles.add(180);
+        continue;
+      }
+
+      wristAngles.add(AngleCalculator.calculateAngle(elbow, wrist, index));
+    }
+
+    if (wristAngles.isEmpty) return phases;
+
+    double minAngle = 180;
+    int bottomIndex = 0;
+    for (int i = 0; i < wristAngles.length; i++) {
+      if (wristAngles[i] < minAngle) {
+        minAngle = wristAngles[i];
+        bottomIndex = i;
+      }
+    }
+
+    for (int i = 0; i < frames.length; i++) {
+      ExercisePhase phase;
+      if (i < bottomIndex * 0.3) {
+        phase = ExercisePhase.setup;
+      } else if (i < bottomIndex) {
+        phase = ExercisePhase.descent;
+      } else if (i == bottomIndex) {
+        phase = ExercisePhase.bottom;
+      } else if (i < frames.length * 0.9) {
+        phase = ExercisePhase.ascent;
+      } else {
+        phase = ExercisePhase.lockout;
+      }
+      phases.add(MapEntry(phase, i));
+    }
+
+    return phases;
+  }
+
   /// 바텀/전환 프레임 인덱스 목록 반환 (핵심 평가 구간)
   static List<int> getKeyFrameIndices(List<MapEntry<ExercisePhase, int>> phases) {
     return phases
