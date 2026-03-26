@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rexx_app/features/pose_evaluation/models/pose_frame.dart';
 import 'package:rexx_app/features/pose_evaluation/models/exercise_phase.dart';
@@ -103,6 +104,45 @@ List<PoseFrame> _deadliftFrames() {
   return frames;
 }
 
+/// 리스트컬 시뮬레이션: 직립, 손목 ROM 큼, 팔꿈치/무릎/힙 ROM 최소
+List<PoseFrame> _wristCurlFrames() {
+  final frames = <PoseFrame>[];
+  final wristAngles = [170.0, 155.0, 135.0, 120.0, 135.0, 155.0, 170.0, 155.0, 135.0, 120.0];
+
+  final elbowX = 0.5, elbowY = 0.40;
+  final wristX = 0.5, wristY = 0.55;
+  final baseAngle = atan2(wristY - elbowY, wristX - elbowX);
+
+  for (int i = 0; i < 10; i++) {
+    final targetRad = wristAngles[i] * pi / 180;
+    final indexAngle = baseAngle + (pi - targetRad);
+    final indexX = wristX + 0.1 * cos(indexAngle);
+    final indexY = wristY + 0.1 * sin(indexAngle);
+
+    frames.add(PoseFrame(
+      frameIndex: i,
+      timestamp: i / 5.0,
+      landmarks: [
+        _lm(PoseFrame.leftShoulder, 0.5, 0.25),
+        _lm(PoseFrame.rightShoulder, 0.5, 0.25, likelihood: 0.5),
+        _lm(PoseFrame.leftElbow, elbowX, elbowY),
+        _lm(PoseFrame.rightElbow, elbowX, elbowY, likelihood: 0.5),
+        _lm(PoseFrame.leftWrist, wristX, wristY),
+        _lm(PoseFrame.rightWrist, wristX, wristY, likelihood: 0.5),
+        _lm(19, indexX, indexY),
+        _lm(20, indexX, indexY, likelihood: 0.5),
+        _lm(PoseFrame.leftHip, 0.5, 0.60),
+        _lm(PoseFrame.rightHip, 0.5, 0.60, likelihood: 0.5),
+        _lm(PoseFrame.leftKnee, 0.5, 0.75),
+        _lm(PoseFrame.rightKnee, 0.5, 0.75, likelihood: 0.5),
+        _lm(PoseFrame.leftAnkle, 0.5, 0.90),
+        _lm(PoseFrame.rightAnkle, 0.5, 0.90, likelihood: 0.5),
+      ],
+    ));
+  }
+  return frames;
+}
+
 void main() {
   group('ExerciseClassifier', () {
     late ExerciseClassifier classifier;
@@ -133,6 +173,11 @@ void main() {
       final result = classifier.classify(_squatFrames());
       final sum = result.probabilities.values.reduce((a, b) => a + b);
       expect(sum, closeTo(1.0, 0.01));
+    });
+
+    test('리스트컬 프레임을 wristCurl로 분류한다', () {
+      final result = classifier.classify(_wristCurlFrames());
+      expect(result.bestMatch, ExerciseType.wristCurl);
     });
 
     test('프레임이 부족하면 모든 확률이 균등하다', () {

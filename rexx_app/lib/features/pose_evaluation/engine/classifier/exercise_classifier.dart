@@ -61,10 +61,12 @@ class ExerciseClassifier {
       final leftIndices = [
         PoseFrame.leftShoulder, PoseFrame.leftHip, PoseFrame.leftKnee,
         PoseFrame.leftElbow, PoseFrame.leftWrist, PoseFrame.leftAnkle,
+        PoseFrame.leftIndex,
       ];
       final rightIndices = [
         PoseFrame.rightShoulder, PoseFrame.rightHip, PoseFrame.rightKnee,
         PoseFrame.rightElbow, PoseFrame.rightWrist, PoseFrame.rightAnkle,
+        PoseFrame.rightIndex,
       ];
 
       double leftSum = 0, rightSum = 0;
@@ -93,10 +95,12 @@ class ExerciseClassifier {
     final hipIdx = useLeft ? PoseFrame.leftHip : PoseFrame.rightHip;
     final kneeIdx = useLeft ? PoseFrame.leftKnee : PoseFrame.rightKnee;
     final ankleIdx = useLeft ? PoseFrame.leftAnkle : PoseFrame.rightAnkle;
+    final indexIdx = useLeft ? PoseFrame.leftIndex : PoseFrame.rightIndex;
 
     double kneeMin = 180, kneeMax = 0;
     double elbowMin = 180, elbowMax = 0;
     double hipMin = 180, hipMax = 0;
+    double wristMin = 180, wristMax = 0;
 
     for (final frame in frames) {
       final shoulder = frame.getLandmark(shoulderIdx);
@@ -121,12 +125,19 @@ class ExerciseClassifier {
         hipMin = min(hipMin, hipAngle);
         hipMax = max(hipMax, hipAngle);
       }
+      final indexFinger = frame.getLandmark(indexIdx);
+      if (elbow != null && wrist != null && indexFinger != null && indexFinger.likelihood >= 0.5) {
+        final wristAngle = AngleCalculator.calculateAngle(elbow, wrist, indexFinger);
+        wristMin = min(wristMin, wristAngle);
+        wristMax = max(wristMax, wristAngle);
+      }
     }
 
     return {
       'knee': kneeMax > kneeMin ? kneeMax - kneeMin : 0,
       'elbow': elbowMax > elbowMin ? elbowMax - elbowMin : 0,
       'hip': hipMax > hipMin ? hipMax - hipMin : 0,
+      'wrist': wristMax > wristMin ? wristMax - wristMin : 0,
     };
   }
 
@@ -170,7 +181,8 @@ class ExerciseClassifier {
         ? (hipYMax - hipYMin) / bodyHeight * 100
         : 0.0;
 
-    final upperMotion = roms['elbow']! + normalizedShoulderMove;
+    final wristRom = roms['wrist'] ?? 0.0;
+    final upperMotion = roms['elbow']! + wristRom + normalizedShoulderMove;
     final lowerMotion = roms['knee']! + normalizedHipMove;
     final total = upperMotion + lowerMotion;
 
