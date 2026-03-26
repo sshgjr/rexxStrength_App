@@ -95,4 +95,36 @@ class AngleCalculator {
     final score = 100.0 * (1 - deviation / tolerance);
     return score.clamp(0.0, 100.0);
   }
+
+  /// 좌표 안정성 점수 (0-100)
+  /// 랜드마크 리스트의 (x, y) 좌표 표준편차를 체고 대비 정규화하여 평가
+  /// stableThreshold (0.02) 이하면 100점, unstableThreshold (0.08) 이상이면 0점
+  static double positionStability(
+    List<PoseLandmark> positions,
+    double bodyHeight, {
+    double stableThreshold = 0.02,
+    double unstableThreshold = 0.08,
+  }) {
+    if (positions.isEmpty || bodyHeight <= 0) return 50.0;
+
+    double sumX = 0, sumY = 0;
+    for (final p in positions) {
+      sumX += p.x;
+      sumY += p.y;
+    }
+    final meanX = sumX / positions.length;
+    final meanY = sumY / positions.length;
+
+    double sumSqDist = 0;
+    for (final p in positions) {
+      sumSqDist += (p.x - meanX) * (p.x - meanX) + (p.y - meanY) * (p.y - meanY);
+    }
+    final std = sqrt(sumSqDist / positions.length);
+    final normalizedStd = std / bodyHeight;
+
+    if (normalizedStd <= stableThreshold) return 100.0;
+    if (normalizedStd >= unstableThreshold) return 0.0;
+
+    return 100.0 * (1 - (normalizedStd - stableThreshold) / (unstableThreshold - stableThreshold));
+  }
 }

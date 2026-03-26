@@ -104,4 +104,36 @@ void main() {
       expect(AngleCalculator.calculateVerticalAngle(top, bottom), closeTo(45.0, 0.01));
     });
   });
+
+  group('AngleCalculator.positionStability', () {
+    test('좌표가 고정이면 100점', () {
+      final positions = [
+        _lm(0.5, 0.5),
+        _lm(0.5, 0.5),
+        _lm(0.5, 0.5),
+      ];
+      expect(AngleCalculator.positionStability(positions, 0.6), 100.0);
+    });
+
+    test('좌표 이동이 크면 0점', () {
+      final positions = [
+        _lm(0.1, 0.1),
+        _lm(0.5, 0.5),
+        _lm(0.9, 0.9),
+      ];
+      final score = AngleCalculator.positionStability(positions, 0.6);
+      expect(score, 0.0);
+    });
+
+    test('중간 이동이면 중간 점수', () {
+      final positions = [
+        _lm(0.5, 0.5),
+        _lm(0.52, 0.51),
+        _lm(0.49, 0.50),
+      ];
+      final score = AngleCalculator.positionStability(positions, 0.6);
+      expect(score, greaterThan(0));
+      expect(score, lessThan(100));
+    });
+  });
 }
