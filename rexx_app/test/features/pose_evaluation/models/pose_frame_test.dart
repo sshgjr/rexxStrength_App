@@ -43,5 +43,10 @@ void main() {
       expect(PoseFrame.leftKnee, 25);
       expect(PoseFrame.leftAnkle, 27);
     });
+
+    test('검지 랜드마크 상수 값', () {
+      expect(PoseFrame.leftIndex, 19);
+      expect(PoseFrame.rightIndex, 20);
+    });
   });
 }

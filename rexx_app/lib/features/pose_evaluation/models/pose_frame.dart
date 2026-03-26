@@ -67,4 +67,6 @@ class PoseFrame {
   static const int rightAnkle = 28;
   static const int leftFootIndex = 31;
   static const int rightFootIndex = 32;
+  static const int leftIndex = 19;   // 왼쪽 검지
+  static const int rightIndex = 20;  // 오른쪽 검지
 }
