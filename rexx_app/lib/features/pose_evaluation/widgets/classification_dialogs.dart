@@ -93,7 +93,7 @@ Future<ExerciseType?> showClassificationFailedDialog(
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(
-              '현재 지원: 스쿼트 · 벤치프레스 · 데드리프트',
+              '현재 지원: 스쿼트 · 벤치프레스 · 데드리프트 · 리스트컬',
               style: TextStyle(color: _textSub, fontSize: 12),
             ),
           ),

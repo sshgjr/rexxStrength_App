@@ -91,6 +91,13 @@ class ExerciseSelectScreen extends StatelessWidget {
               icon: Icons.height,
               description: '후면 사슬 강화, 힙 힌지와 등 각도를 평가합니다.',
             ),
+            const SizedBox(height: 12),
+            _buildExerciseCard(
+              context,
+              exerciseType: ExerciseType.wristCurl,
+              icon: Icons.front_hand,
+              description: '전완 강화, 손목 가동범위와 팔꿈치 고정을 분석합니다.',
+            ),
           ],
         ),
       ),
