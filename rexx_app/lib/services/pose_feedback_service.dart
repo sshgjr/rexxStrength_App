@@ -54,7 +54,7 @@ extension FeedbackErrorMessage on FeedbackError {
 
 /// 온라인/오프라인 피드백 서비스
 class PoseFeedbackService {
-  static const int _maxGuestFeedbackCount = 2;
+  static const int _maxGuestFeedbackCount = 999; // TODO: 테스트 후 2로 복원
   static const String _guestCountKey = 'guest_feedback_count';
 
   /// 게스트 AI 피드백 남은 횟수 확인
