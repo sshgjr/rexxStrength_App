@@ -123,38 +123,44 @@ class WristCurlRules implements ExerciseRule {
   // ── 2. 전완 고정도 ───────────────────────────────────────
   // elbow ~ wrist 중간점의 흔들림을 신체 높이 대비로 측정
   CriterionResult _evaluateForearmStability(List<PoseFrame> frames) {
-    final midPoints = <PoseLandmark>[];
-    double bodyHeight = 0.6;
+  final midXList = <double>[];
+  final midYList = <double>[];
+  double bodyHeight = 0.6;
 
-    for (final frame in frames) {
-      final elbow    = frame.getLandmark(PoseFrame.leftElbow);
-      final wrist    = frame.getLandmark(PoseFrame.leftWrist);
-      final shoulder = frame.getLandmark(PoseFrame.leftShoulder);
-      final ankle    = frame.getLandmark(PoseFrame.leftAnkle);
+  for (final frame in frames) {
+    final elbow    = frame.getLandmark(PoseFrame.leftElbow);
+    final wrist    = frame.getLandmark(PoseFrame.leftWrist);
+    final shoulder = frame.getLandmark(PoseFrame.leftShoulder);
+    final ankle    = frame.getLandmark(PoseFrame.leftAnkle);
 
-      if (elbow != null && wrist != null) {
-        midPoints.add(PoseLandmark(
-          x: (elbow.x + wrist.x) / 2,
-          y: (elbow.y + wrist.y) / 2,
-          likelihood: 1.0,
-        ));
-      }
-      if (shoulder != null && ankle != null) {
-        final h = (shoulder.y - ankle.y).abs();
-        if (h > bodyHeight) bodyHeight = h;
-      }
+    if (elbow != null && wrist != null) {
+      midXList.add((elbow.x + wrist.x) / 2);
+      midYList.add((elbow.y + wrist.y) / 2);
     }
-
-    final score = AngleCalculator.positionStability(midPoints, bodyHeight);
-
-    return CriterionResult(
-      name: '전완 고정도',
-      description: '운동 중 전완 안정성 (흔들림 최소화)',
-      score: score,
-      weight: 0.20,
-      grade: CriterionGrade.fromScore(score),
-    );
+    if (shoulder != null && ankle != null) {
+      final h = (shoulder.y - ankle.y).abs();
+      if (h > bodyHeight) bodyHeight = h;
+    }
   }
+
+  double score = 70.0;
+  if (midXList.length >= 2 && bodyHeight > 0) {
+    final meanX = midXList.reduce((a, b) => a + b) / midXList.length;
+    final meanY = midYList.reduce((a, b) => a + b) / midYList.length;
+    final varX  = midXList.fold(0.0, (s, x) => s + (x - meanX) * (x - meanX)) / midXList.length;
+    final varY  = midYList.fold(0.0, (s, y) => s + (y - meanY) * (y - meanY)) / midYList.length;
+    final std   = sqrt(varX + varY) / bodyHeight;
+    score = (100.0 * (1.0 - std / 0.05)).clamp(0.0, 100.0);
+  }
+
+  return CriterionResult(
+    name: '전완 고정도',
+    description: '운동 중 전완 안정성 (흔들림 최소화)',
+    score: score,
+    weight: 0.20,
+    grade: CriterionGrade.fromScore(score),
+  );
+}
 
   // ── 3. 동작 일관성 ───────────────────────────────────────
   // 각 렙의 ROM 편차(표준편차)로 일관성 측정
