@@ -11,11 +11,10 @@ import 'rules/squat_rules.dart';
 import 'rules/bench_press_rules.dart';
 import 'rules/deadlift_rules.dart';
 import 'rules/wrist_curl_rules.dart';
-import 'rules/side_pressure_rules.dart';
-import 'rules/pronation_curl_rules.dart'; // 추가
 import 'pose_detector_stub.dart';
 import 'classifier/exercise_classifier.dart';
 import '../models/classification_result.dart';
+import 'layer_classifier.dart';
 
 /// 시뮬레이터 모드 여부 (빌드 시 --dart-define=SIMULATOR_MODE=true 로 설정)
 const bool isSimulatorMode =
@@ -39,18 +38,26 @@ class PoseAnalyzer {
     }
   }
 
+  /// 영상 파일에서 프레임 추출 → 포즈 분석 → (자동 분류) → 규칙 평가
+  /// [exerciseType]이 null이면 자동 분류 수행
+  /// [onClassificationNeeded] 분류 confidence가 낮을 때 사용자 선택을 요청하는 콜백
+  /// [onAutoClassified] moderate 확정 시 호출 (토스트 표시용)
+  /// [onProgress] 콜백: 0.0 ~ 1.0
   Future<EvaluationResult> analyze({
     required String videoPath,
     ExerciseType? exerciseType,
+    LayerClassifier? layerClassifier,
     Future<ExerciseType> Function(ClassificationResult)? onClassificationNeeded,
     void Function(ExerciseType)? onAutoClassified,
     void Function(double progress)? onProgress,
   }) async {
     onProgress?.call(0.0);
 
+    // 1. 프레임 추출
     final frames = await _extractFrames(videoPath);
     onProgress?.call(0.3);
 
+    // 2. 포즈 감지
     final List<PoseFrame> poseFrames;
     if (isSimulatorMode) {
       poseFrames = await _stub!.detectPoses(frames);
@@ -59,6 +66,7 @@ class PoseAnalyzer {
     }
     onProgress?.call(0.7);
 
+    // 2.5. 운동 종류 결정
     final ExerciseType resolvedType;
     if (exerciseType != null) {
       resolvedType = exerciseType;
@@ -78,14 +86,23 @@ class PoseAnalyzer {
       }
     }
 
+    // 3. 규칙 기반 평가
     final rule = _getRule(resolvedType);
     final criteria = rule.evaluate(poseFrames);
 
+    // 3.5 레이어 분류 (분류기 제공 시)
+    LayerClassification? layerClassification;
+    if (layerClassifier != null) {
+      layerClassification = layerClassifier.classify(criteria, resolvedType);
+    }
+
+    // 4. 총점 계산 (가중 평균)
     double totalScore = 0;
     for (final c in criteria) {
       totalScore += c.score * c.weight;
     }
 
+    // 5. 이슈 감지
     final issues = criteria
         .where((c) => c.grade != CriterionGrade.good)
         .map((c) =>
@@ -94,6 +111,7 @@ class PoseAnalyzer {
 
     onProgress?.call(1.0);
 
+    // 6. 임시 파일 정리
     await _cleanup(frames);
 
     return EvaluationResult(
@@ -102,12 +120,15 @@ class PoseAnalyzer {
       criteria: criteria,
       detectedIssues: issues,
       evaluatedAt: DateTime.now(),
+      layerClassification: layerClassification,
     );
   }
 
+  /// 디버그용 분석 — 프레임 이미지를 삭제하지 않고 반환
   Future<DebugAnalysisData> analyzeWithDebug({
     required String videoPath,
     ExerciseType? exerciseType,
+    LayerClassifier? layerClassifier,
     Future<ExerciseType> Function(ClassificationResult)? onClassificationNeeded,
     void Function(ExerciseType)? onAutoClassified,
     void Function(double progress)? onProgress,
@@ -125,6 +146,7 @@ class PoseAnalyzer {
     }
     onProgress?.call(0.7);
 
+    // 운동 종류 결정 (analyze()와 동일 로직)
     final ExerciseType resolvedType;
     if (exerciseType != null) {
       resolvedType = exerciseType;
@@ -147,6 +169,12 @@ class PoseAnalyzer {
     final rule = _getRule(resolvedType);
     final criteria = rule.evaluate(poseFrames);
 
+    // 3.5 레이어 분류 (분류기 제공 시)
+    LayerClassification? layerClassification;
+    if (layerClassifier != null) {
+      layerClassification = layerClassifier.classify(criteria, resolvedType);
+    }
+
     double totalScore = 0;
     for (final c in criteria) {
       totalScore += c.score * c.weight;
@@ -160,12 +188,14 @@ class PoseAnalyzer {
 
     onProgress?.call(1.0);
 
+    // _cleanup 생략 — 프레임 경로를 디버그 화면에서 사용
     final result = EvaluationResult(
       exerciseType: resolvedType,
       totalScore: totalScore.round(),
       criteria: criteria,
       detectedIssues: issues,
       evaluatedAt: DateTime.now(),
+      layerClassification: layerClassification,
     );
 
     return DebugAnalysisData(
@@ -175,9 +205,11 @@ class PoseAnalyzer {
     );
   }
 
+  /// video_thumbnail로 5FPS JPEG 프레임 추출
   Future<List<String>> _extractFrames(String videoPath) async {
     final tempDir = Directory.systemTemp.createTempSync('rexx_frames_');
 
+    // 영상 길이 파악
     final controller = VideoPlayerController.file(File(videoPath));
     await controller.initialize();
     final durationMs = controller.value.duration.inMilliseconds;
@@ -187,6 +219,7 @@ class PoseAnalyzer {
       throw Exception('프레임 추출 실패: 영상 길이를 알 수 없습니다');
     }
 
+    // 200ms 간격 (5FPS) 으로 프레임 추출
     const intervalMs = 200;
     final framePaths = <String>[];
 
@@ -214,6 +247,7 @@ class PoseAnalyzer {
     return framePaths;
   }
 
+  /// 각 프레임 이미지에서 ML Kit PoseDetector 실행
   Future<List<PoseFrame>> _detectPoses(List<String> framePaths) async {
     final poseFrames = <PoseFrame>[];
 
@@ -237,7 +271,7 @@ class PoseAnalyzer {
 
         poseFrames.add(PoseFrame(
           frameIndex: i,
-          timestamp: i / 5.0,
+          timestamp: i / 5.0, // 5 FPS
           landmarks: landmarks,
         ));
       }
@@ -257,13 +291,10 @@ class PoseAnalyzer {
         return DeadliftRules();
       case ExerciseType.wristCurl:
         return WristCurlRules();
-      case ExerciseType.sidePressure:
-        return SidePressureRules();
-      case ExerciseType.pronationCurl: // 추가
-        return PronationCurlRules();
     }
   }
 
+  /// 임시 프레임 파일 정리
   Future<void> _cleanup(List<String> framePaths) async {
     if (framePaths.isEmpty) return;
     try {
@@ -274,6 +305,7 @@ class PoseAnalyzer {
     } catch (_) {}
   }
 
+  /// 리소스 해제
   void dispose() {
     if (isSimulatorMode) {
       _stub?.close();
@@ -281,4 +313,4 @@ class PoseAnalyzer {
       _poseDetector?.close();
     }
   }
-}  
+}

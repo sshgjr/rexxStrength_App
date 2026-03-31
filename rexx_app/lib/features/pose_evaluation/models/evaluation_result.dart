@@ -1,5 +1,6 @@
 import '../../../services/pose_feedback_service.dart';
 import 'exercise_phase.dart';
+import '../engine/layer_classifier.dart';
 
 /// 개별 평가 기준의 결과
 class CriterionResult {
@@ -59,6 +60,7 @@ class EvaluationResult {
   final DateTime evaluatedAt;
   final String? feedbackText; // LLM 피드백 (온라인 시)
   final FeedbackError? feedbackError; // 피드백 실패 원인
+  final LayerClassification? layerClassification; // 2-레이어 분류 결과
 
   const EvaluationResult({
     required this.exerciseType,
@@ -68,9 +70,14 @@ class EvaluationResult {
     required this.evaluatedAt,
     this.feedbackText,
     this.feedbackError,
+    this.layerClassification,
   });
 
-  EvaluationResult copyWith({String? feedbackText, FeedbackError? feedbackError}) {
+  EvaluationResult copyWith({
+    String? feedbackText,
+    FeedbackError? feedbackError,
+    LayerClassification? layerClassification,
+  }) {
     return EvaluationResult(
       exerciseType: exerciseType,
       totalScore: totalScore,
@@ -79,6 +86,7 @@ class EvaluationResult {
       evaluatedAt: evaluatedAt,
       feedbackText: feedbackText ?? this.feedbackText,
       feedbackError: feedbackError ?? this.feedbackError,
+      layerClassification: layerClassification ?? this.layerClassification,
     );
   }
 
