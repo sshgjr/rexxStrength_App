@@ -92,6 +92,7 @@ class _PoseResultScreenState extends State<PoseResultScreen> {
                 feedbackText: widget.result.feedbackText,
                 offlineFeedback: widget.result.offlineFeedback,
                 error: widget.result.feedbackError,
+                layerClassification: widget.result.layerClassification,
               ),
               const SizedBox(height: 30),
 
