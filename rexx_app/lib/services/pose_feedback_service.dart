@@ -76,6 +76,7 @@ class PoseFeedbackService {
   Future<FeedbackResult> requestFeedback({
     required EvaluationResult result,
     required String? token,
+    String userLevel = 'beginner',
   }) async {
     // 1. 토큰 확인 — 게스트 모드 처리
     final bool isGuest = token == null;
@@ -100,7 +101,7 @@ class PoseFeedbackService {
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/api/pose/feedback'),
         headers: headers,
-        body: jsonEncode(result.toJson()),
+        body: jsonEncode(result.toJson(userLevel: userLevel)),
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {

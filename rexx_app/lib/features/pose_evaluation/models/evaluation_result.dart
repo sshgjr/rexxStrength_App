@@ -102,10 +102,19 @@ class EvaluationResult {
         '인터넷 연결 시 더 자세한 피드백을 받을 수 있습니다.';
   }
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({String userLevel = 'beginner'}) => {
         'exercise_type': exerciseType.apiName,
         'total_score': totalScore,
         'criteria_scores': criteria.map((c) => c.toJson()).toList(),
         'detected_issues': detectedIssues,
+        'user_level': userLevel,
+        'layer1_issues': layerClassification?.layer1Issues
+                .map((i) => i.toJson())
+                .toList() ??
+            [],
+        'layer2_issues': layerClassification?.layer2Issues
+                .map((i) => i.toJson())
+                .toList() ??
+            [],
       };
 }
