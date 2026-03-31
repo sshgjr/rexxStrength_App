@@ -41,36 +41,44 @@ class _OneRMPageState extends State<OneRMPage> {
   }
 
   void handleCalculate() {
-    FocusScope.of(context).unfocus();
+  FocusScope.of(context).unfocus();
 
-    final weight = double.tryParse(weightController.text);
-    final reps = int.tryParse(repsController.text);
+  final weight = double.tryParse(weightController.text);
+  final reps = int.tryParse(repsController.text);
 
-    if (weight == null || reps == null || weight <= 0 || reps <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('무게와 반복 횟수를 올바르게 입력해주세요.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-
-    final oneRM = calculate1RM(weight, reps);
-
-    final table = List.generate(10, (index) {
-      final rm = index + 1;
-      final percent = rmPercentages[index];
-      final estimatedWeight = oneRM * percent;
-
-      return {'rm': rm, 'percent': percent * 100, 'weight': estimatedWeight};
-    });
-
-    setState(() {
-      estimatedOneRM = oneRM;
-      rmTable = table;
-    });
+  if (weight == null || reps == null || weight <= 0 || reps <= 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('무게와 반복 횟수를 올바르게 입력해주세요.'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+    return;
   }
+
+  // 입력한 reps에 해당하는 RM 퍼센트로 1RM 역산
+  final double oneRM;
+  if (reps >= 1 && reps <= 10) {
+    oneRM = weight / rmPercentages[reps - 1];
+  } else {
+    // 10RM 초과 시 Epley 공식으로 계산
+    oneRM = weight * (1 + reps / 30);
+  }
+
+  final table = List.generate(10, (index) {
+    final rm = index + 1;
+    final percent = rmPercentages[index];
+    // 입력한 reps와 동일한 RM이면 입력 무게 그대로 표시
+    final estimatedWeight = (rm == reps) ? weight : oneRM * percent;
+
+    return {'rm': rm, 'percent': percent * 100, 'weight': estimatedWeight};
+  });
+
+  setState(() {
+    estimatedOneRM = oneRM;
+    rmTable = table;
+  });
+}
 
   @override
   void dispose() {
