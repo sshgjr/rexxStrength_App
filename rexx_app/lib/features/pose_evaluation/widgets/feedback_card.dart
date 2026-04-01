@@ -46,11 +46,6 @@ class FeedbackCard extends StatelessWidget {
     final parsed = _parseFeedback();
     final isOnline = feedbackText != null;
 
-    // 빈 피드백 (상급+L2만 또는 이슈 없음)
-    if (parsed != null && _isEmptyFeedback(parsed)) {
-      return _buildNoIssueFeedback();
-    }
-
     // 구조화된 JSON 피드백
     if (parsed != null) {
       return _buildStructuredFeedback(parsed);

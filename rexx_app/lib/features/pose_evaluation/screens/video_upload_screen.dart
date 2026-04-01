@@ -205,23 +205,6 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
         if (!mounted) return;
 
         final result = debugData.result;
-        final classification = result.layerClassification;
-
-        // 등급 기반 출력 결정
-        if (classification != null && !classification.shouldRequestFeedback(userLevel)) {
-          // 서버 호출 스킵
-          final finalResult = result.copyWith(
-            feedbackText: '{"feedback":"","keypoint":"","cause":""}',
-          );
-          if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PoseResultScreen(result: finalResult, token: widget.token),
-            ),
-          );
-          return;
-        }
 
         setState(() { _statusText = '피드백 생성 중...'; });
 
@@ -258,23 +241,6 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
       );
 
       analyzer.dispose();
-
-      final classification = result.layerClassification;
-
-      // 등급 기반 출력 결정
-      if (classification != null && !classification.shouldRequestFeedback(userLevel)) {
-        final finalResult = result.copyWith(
-          feedbackText: '{"feedback":"","keypoint":"","cause":""}',
-        );
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PoseResultScreen(result: finalResult, token: widget.token),
-          ),
-        );
-        return;
-      }
 
       setState(() { _statusText = '피드백 생성 중...'; });
 

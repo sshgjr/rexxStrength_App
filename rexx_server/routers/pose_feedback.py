@@ -43,26 +43,15 @@ def create_feedback(
     current_user: User | None = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
-    # 상급자 + L2만 또는 이슈 없음 → 스킵
-    has_l1 = len(data.layer1_issues) > 0
-    has_l2 = len(data.layer2_issues) > 0
-    no_issues = not has_l1 and not has_l2
-
-    if no_issues or (data.user_level == "advanced" and not has_l1 and has_l2):
-        feedback_text = json.dumps(
-            {"feedback": "", "keypoint": "", "cause": ""},
-            ensure_ascii=False,
-        )
-    else:
-        feedback_text = generate_feedback(
-            exercise_type=data.exercise_type,
-            total_score=data.total_score,
-            criteria_scores=[c.model_dump() for c in data.criteria_scores],
-            detected_issues=data.detected_issues,
-            user_level=data.user_level,
-            layer1_issues=[i.model_dump() for i in data.layer1_issues],
-            layer2_issues=[i.model_dump() for i in data.layer2_issues],
-        )
+    feedback_text = generate_feedback(
+        exercise_type=data.exercise_type,
+        total_score=data.total_score,
+        criteria_scores=[c.model_dump() for c in data.criteria_scores],
+        detected_issues=data.detected_issues,
+        user_level=data.user_level,
+        layer1_issues=[i.model_dump() for i in data.layer1_issues],
+        layer2_issues=[i.model_dump() for i in data.layer2_issues],
+    )
 
     session_id = None
 
