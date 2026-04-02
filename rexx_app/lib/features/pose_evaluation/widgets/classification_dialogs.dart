@@ -92,8 +92,9 @@ Future<ExerciseType?> showClassificationFailedDialog(
               color: _bg,
               borderRadius: BorderRadius.circular(8),
             ),
+            // 사이드프레셔 추가
             child: const Text(
-              '현재 지원: 스쿼트 · 벤치프레스 · 데드리프트 · 리스트컬',
+              '현재 지원: 스쿼트 · 벤치프레스 · 데드리프트 · 리스트컬 · 사이드프레셔',
               style: TextStyle(color: _textSub, fontSize: 12),
             ),
           ),
@@ -119,7 +120,7 @@ Future<ExerciseType?> showClassificationFailedDialog(
   if (!context.mounted) return null;
 
   if (isSupportedExercise == true) {
-    // Step 2a: 3개 운동 확률순 선택
+    // Step 2a: 전체 운동 확률순 선택 (사이드프레셔 자동 포함 — sortedTypes가 ExerciseType.values 기반)
     return showDialog<ExerciseType>(
       context: context,
       barrierDismissible: false,
@@ -218,7 +219,6 @@ Future<void> _showUnsupportedExerciseFeedback(BuildContext context) async {
     ),
   );
 
-  // 피드백 저장
   final feedbackText = controller.text.trim();
   if (submitted == true && feedbackText.isNotEmpty) {
     await _saveFeedback(feedbackText);
@@ -226,7 +226,6 @@ Future<void> _showUnsupportedExerciseFeedback(BuildContext context) async {
 
   if (!context.mounted) return;
 
-  // 감사 메시지 + 네비게이션 선택
   await showDialog(
     context: context,
     barrierDismissible: false,
@@ -254,16 +253,15 @@ Future<void> _showUnsupportedExerciseFeedback(BuildContext context) async {
       actions: [
         TextButton(
           onPressed: () {
-            Navigator.pop(ctx); // 다이얼로그 닫기
-            // 메인으로 돌아가기: 현재 화면 스택을 모두 팝
+            Navigator.pop(ctx);
             Navigator.of(context).popUntil((route) => route.isFirst);
           },
           child: const Text('메인으로 돌아가기', style: TextStyle(color: _textSub)),
         ),
         ElevatedButton(
           onPressed: () {
-            Navigator.pop(ctx); // 다이얼로그 닫기
-            Navigator.pop(context); // VideoUploadScreen → ExerciseSelectScreen
+            Navigator.pop(ctx);
+            Navigator.pop(context);
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: _primary,
