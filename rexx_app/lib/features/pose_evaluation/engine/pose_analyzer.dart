@@ -11,6 +11,7 @@ import 'rules/squat_rules.dart';
 import 'rules/bench_press_rules.dart';
 import 'rules/deadlift_rules.dart';
 import 'rules/wrist_curl_rules.dart';
+import 'rules/side_pressure_rules.dart'; // 추가
 import 'pose_detector_stub.dart';
 import 'classifier/exercise_classifier.dart';
 import '../models/classification_result.dart';
@@ -274,6 +275,8 @@ class PoseAnalyzer {
         return DeadliftRules();
       case ExerciseType.wristCurl:
         return WristCurlRules();
+      case ExerciseType.sidePressure:  // 추가
+        return SidePressureRules();
     }
   }
 
