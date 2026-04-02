@@ -12,7 +12,8 @@ enum ExerciseType {
   squat,
   benchPress,
   deadlift,
-  wristCurl;
+  wristCurl,
+  sidePressure;
 
   String get displayName {
     switch (this) {
@@ -24,6 +25,8 @@ enum ExerciseType {
         return '데드리프트';
       case ExerciseType.wristCurl:
         return '리스트컬';
+      case ExerciseType.sidePressure:
+        return '사이드프레셔';
     }
   }
 
@@ -37,6 +40,31 @@ enum ExerciseType {
         return 'deadlift';
       case ExerciseType.wristCurl:
         return 'wrist_curl';
+      case ExerciseType.sidePressure:
+        return 'side_pressure';
+    }
+  }
+
+  /// 팔씨름 보조 운동 여부
+  bool get isArmWrestlingExercise {
+    switch (this) {
+      case ExerciseType.sidePressure:
+      case ExerciseType.wristCurl:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /// 파워리프팅 운동 여부
+  bool get isPowerlifting {
+    switch (this) {
+      case ExerciseType.squat:
+      case ExerciseType.benchPress:
+      case ExerciseType.deadlift:
+        return true;
+      default:
+        return false;
     }
   }
 }
