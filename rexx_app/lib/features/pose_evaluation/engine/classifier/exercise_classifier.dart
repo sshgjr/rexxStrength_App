@@ -6,7 +6,7 @@ import '../angle_calculator.dart';
 
 /// ML Kit 포즈 랜드마크 기반 운동 자동 분류기
 class ExerciseClassifier {
-  // Feature weights (스펙 1.2)
+  // Feature weights
   static const double _w1 = 0.35; // ROM
   static const double _w2 = 0.25; // 상하체 비율
   static const double _w3 = 0.40; // torso orientation
@@ -14,7 +14,6 @@ class ExerciseClassifier {
   /// 포즈 프레임 리스트로 운동 종류를 분류한다
   ClassificationResult classify(List<PoseFrame> frames) {
     if (frames.length < 5) {
-      // 프레임 부족 시 균등 확률 (스펙 섹션 8: < 5프레임이면 에러)
       final count = ExerciseType.values.length;
       return ClassificationResult(probabilities: {
         for (final type in ExerciseType.values) type: 1.0 / count,
@@ -23,12 +22,10 @@ class ExerciseClassifier {
 
     final useLeft = chooseSide(frames);
 
-    // 특징 추출
     final roms = _extractROMs(frames, useLeft);
     final ratio = _extractMotionRatio(frames, useLeft, roms);
     final avgOrientation = _extractTorsoOrientation(frames, useLeft);
 
-    // 각 운동별 스코어 계산
     final scores = <ExerciseType, double>{};
     for (final type in ExerciseType.values) {
       final romScore = _romScore(type, roms);
@@ -37,7 +34,6 @@ class ExerciseClassifier {
       scores[type] = _w1 * romScore + _w2 * ratioScore + _w3 * orientationScore;
     }
 
-    // 정규화 → 확률
     final totalScore = scores.values.reduce((a, b) => a + b);
     final probabilities = <ExerciseType, double>{};
     if (totalScore > 0) {
@@ -87,57 +83,63 @@ class ExerciseClassifier {
     return leftWins >= (frames.length / 2).ceil();
   }
 
-  /// ROM 추출: {knee, elbow, hip}
+  /// ROM 추출: {knee, elbow, hip, wrist, shoulderAbduction}
   Map<String, double> _extractROMs(List<PoseFrame> frames, bool useLeft) {
     final shoulderIdx = useLeft ? PoseFrame.leftShoulder : PoseFrame.rightShoulder;
-    final elbowIdx = useLeft ? PoseFrame.leftElbow : PoseFrame.rightElbow;
-    final wristIdx = useLeft ? PoseFrame.leftWrist : PoseFrame.rightWrist;
-    final hipIdx = useLeft ? PoseFrame.leftHip : PoseFrame.rightHip;
-    final kneeIdx = useLeft ? PoseFrame.leftKnee : PoseFrame.rightKnee;
-    final ankleIdx = useLeft ? PoseFrame.leftAnkle : PoseFrame.rightAnkle;
-    final indexIdx = useLeft ? PoseFrame.leftIndex : PoseFrame.rightIndex;
+    final elbowIdx    = useLeft ? PoseFrame.leftElbow    : PoseFrame.rightElbow;
+    final wristIdx    = useLeft ? PoseFrame.leftWrist    : PoseFrame.rightWrist;
+    final hipIdx      = useLeft ? PoseFrame.leftHip      : PoseFrame.rightHip;
+    final kneeIdx     = useLeft ? PoseFrame.leftKnee     : PoseFrame.rightKnee;
+    final ankleIdx    = useLeft ? PoseFrame.leftAnkle    : PoseFrame.rightAnkle;
+    final indexIdx    = useLeft ? PoseFrame.leftIndex    : PoseFrame.rightIndex;
 
     double kneeMin = 180, kneeMax = 0;
     double elbowMin = 180, elbowMax = 0;
     double hipMin = 180, hipMax = 0;
     double wristMin = 180, wristMax = 0;
+    // 사이드프레셔용: 힙-어깨-팔꿈치 각도 (어깨 외전)
+    double shoulderAbdMin = 180, shoulderAbdMax = 0;
 
     for (final frame in frames) {
       final shoulder = frame.getLandmark(shoulderIdx);
-      final elbow = frame.getLandmark(elbowIdx);
-      final wrist = frame.getLandmark(wristIdx);
-      final hip = frame.getLandmark(hipIdx);
-      final knee = frame.getLandmark(kneeIdx);
-      final ankle = frame.getLandmark(ankleIdx);
+      final elbow    = frame.getLandmark(elbowIdx);
+      final wrist    = frame.getLandmark(wristIdx);
+      final hip      = frame.getLandmark(hipIdx);
+      final knee     = frame.getLandmark(kneeIdx);
+      final ankle    = frame.getLandmark(ankleIdx);
 
       if (hip != null && knee != null && ankle != null) {
-        final kneeAngle = AngleCalculator.calculateAngle(hip, knee, ankle);
-        kneeMin = min(kneeMin, kneeAngle);
-        kneeMax = max(kneeMax, kneeAngle);
+        final a = AngleCalculator.calculateAngle(hip, knee, ankle);
+        kneeMin = min(kneeMin, a); kneeMax = max(kneeMax, a);
       }
       if (shoulder != null && elbow != null && wrist != null) {
-        final elbowAngle = AngleCalculator.calculateAngle(shoulder, elbow, wrist);
-        elbowMin = min(elbowMin, elbowAngle);
-        elbowMax = max(elbowMax, elbowAngle);
+        final a = AngleCalculator.calculateAngle(shoulder, elbow, wrist);
+        elbowMin = min(elbowMin, a); elbowMax = max(elbowMax, a);
       }
       if (shoulder != null && hip != null && knee != null) {
-        final hipAngle = AngleCalculator.calculateAngle(shoulder, hip, knee);
-        hipMin = min(hipMin, hipAngle);
-        hipMax = max(hipMax, hipAngle);
+        final a = AngleCalculator.calculateAngle(shoulder, hip, knee);
+        hipMin = min(hipMin, a); hipMax = max(hipMax, a);
       }
       final indexFinger = frame.getLandmark(indexIdx);
-      if (elbow != null && wrist != null && indexFinger != null && indexFinger.likelihood >= 0.5) {
-        final wristAngle = AngleCalculator.calculateAngle(elbow, wrist, indexFinger);
-        wristMin = min(wristMin, wristAngle);
-        wristMax = max(wristMax, wristAngle);
+      if (elbow != null && wrist != null && indexFinger != null &&
+          indexFinger.likelihood >= 0.5) {
+        final a = AngleCalculator.calculateAngle(elbow, wrist, indexFinger);
+        wristMin = min(wristMin, a); wristMax = max(wristMax, a);
+      }
+      // 어깨 외전: 힙→어깨→팔꿈치 각도
+      if (hip != null && shoulder != null && elbow != null) {
+        final a = AngleCalculator.calculateAngle(hip, shoulder, elbow);
+        shoulderAbdMin = min(shoulderAbdMin, a);
+        shoulderAbdMax = max(shoulderAbdMax, a);
       }
     }
 
     return {
-      'knee': kneeMax > kneeMin ? kneeMax - kneeMin : 0,
-      'elbow': elbowMax > elbowMin ? elbowMax - elbowMin : 0,
-      'hip': hipMax > hipMin ? hipMax - hipMin : 0,
-      'wrist': wristMax > wristMin ? wristMax - wristMin : 0,
+      'knee':            kneeMax > kneeMin       ? kneeMax - kneeMin             : 0,
+      'elbow':           elbowMax > elbowMin     ? elbowMax - elbowMin           : 0,
+      'hip':             hipMax > hipMin         ? hipMax - hipMin               : 0,
+      'wrist':           wristMax > wristMin     ? wristMax - wristMin           : 0,
+      'shoulderAbdMin':  shoulderAbdMin < 180    ? shoulderAbdMin                : 90,
     };
   }
 
@@ -148,8 +150,8 @@ class ExerciseClassifier {
     Map<String, double> roms,
   ) {
     final shoulderIdx = useLeft ? PoseFrame.leftShoulder : PoseFrame.rightShoulder;
-    final hipIdx = useLeft ? PoseFrame.leftHip : PoseFrame.rightHip;
-    final ankleIdx = useLeft ? PoseFrame.leftAnkle : PoseFrame.rightAnkle;
+    final hipIdx      = useLeft ? PoseFrame.leftHip      : PoseFrame.rightHip;
+    final ankleIdx    = useLeft ? PoseFrame.leftAnkle    : PoseFrame.rightAnkle;
 
     double shoulderYMin = double.infinity, shoulderYMax = -double.infinity;
     double hipYMin = double.infinity, hipYMax = -double.infinity;
@@ -157,8 +159,8 @@ class ExerciseClassifier {
 
     for (final frame in frames) {
       final shoulder = frame.getLandmark(shoulderIdx);
-      final hip = frame.getLandmark(hipIdx);
-      final ankle = frame.getLandmark(ankleIdx);
+      final hip      = frame.getLandmark(hipIdx);
+      final ankle    = frame.getLandmark(ankleIdx);
 
       if (shoulder != null) {
         shoulderYMin = min(shoulderYMin, shoulder.y);
@@ -181,7 +183,7 @@ class ExerciseClassifier {
         ? (hipYMax - hipYMin) / bodyHeight * 100
         : 0.0;
 
-    final wristRom = roms['wrist'] ?? 0.0;
+    final wristRom   = roms['wrist'] ?? 0.0;
     final upperMotion = roms['elbow']! + wristRom + normalizedShoulderMove;
     final lowerMotion = roms['knee']! + normalizedHipMove;
     final total = upperMotion + lowerMotion;
@@ -192,14 +194,14 @@ class ExerciseClassifier {
   /// 평균 torso orientation (수직 기준 각도)
   double _extractTorsoOrientation(List<PoseFrame> frames, bool useLeft) {
     final shoulderIdx = useLeft ? PoseFrame.leftShoulder : PoseFrame.rightShoulder;
-    final hipIdx = useLeft ? PoseFrame.leftHip : PoseFrame.rightHip;
+    final hipIdx      = useLeft ? PoseFrame.leftHip      : PoseFrame.rightHip;
 
     double sum = 0;
     int count = 0;
 
     for (final frame in frames) {
       final shoulder = frame.getLandmark(shoulderIdx);
-      final hip = frame.getLandmark(hipIdx);
+      final hip      = frame.getLandmark(hipIdx);
       if (shoulder != null && hip != null) {
         sum += AngleCalculator.calculateVerticalAngle(shoulder, hip);
         count++;
@@ -209,45 +211,70 @@ class ExerciseClassifier {
     return count > 0 ? sum / count : 45.0;
   }
 
-  /// ROM 기반 스코어 (스펙 1.2 romScore)
+  /// ROM 기반 스코어
   double _romScore(ExerciseType type, Map<String, double> roms) {
     switch (type) {
       case ExerciseType.squat:
-        return AngleCalculator.rangeScore(roms['knee']!, idealMin: 60, idealMax: 120, tolerance: 30);
+        return AngleCalculator.rangeScore(roms['knee']!,
+            idealMin: 60, idealMax: 120, tolerance: 30);
       case ExerciseType.benchPress:
-        return AngleCalculator.rangeScore(roms['elbow']!, idealMin: 50, idealMax: 110, tolerance: 30);
+        return AngleCalculator.rangeScore(roms['elbow']!,
+            idealMin: 50, idealMax: 110, tolerance: 30);
       case ExerciseType.deadlift:
-        return AngleCalculator.rangeScore(roms['hip']!, idealMin: 50, idealMax: 100, tolerance: 30);
+        return AngleCalculator.rangeScore(roms['hip']!,
+            idealMin: 50, idealMax: 100, tolerance: 30);
       case ExerciseType.wristCurl:
-        return AngleCalculator.rangeScore(roms['wrist'] ?? 0, idealMin: 20, idealMax: 60, tolerance: 20);
+        return AngleCalculator.rangeScore(roms['wrist'] ?? 0,
+            idealMin: 20, idealMax: 60, tolerance: 20);
+      case ExerciseType.sidePressure:
+        // 팔씨름 사이드프레셔: 어깨 외전 각도가 70~100도 범위에 있는지
+        // 팔꿈치 각도 변화는 작고(고정), 어깨 외전이 수평에 가까운 게 특징
+        return AngleCalculator.rangeScore(roms['shoulderAbdMin'] ?? 90,
+            idealMin: 65, idealMax: 100, tolerance: 25);
     }
   }
 
-  /// 상하체 비율 스코어 (스펙 1.2 ratioScore)
+  /// 상하체 비율 스코어
   double _ratioScore(ExerciseType type, double ratio) {
     switch (type) {
       case ExerciseType.squat:
-        return AngleCalculator.rangeScore(ratio, idealMin: 0.15, idealMax: 0.40, tolerance: 0.20);
+        return AngleCalculator.rangeScore(ratio,
+            idealMin: 0.15, idealMax: 0.40, tolerance: 0.20);
       case ExerciseType.benchPress:
-        return AngleCalculator.rangeScore(ratio, idealMin: 0.60, idealMax: 0.90, tolerance: 0.20);
+        return AngleCalculator.rangeScore(ratio,
+            idealMin: 0.60, idealMax: 0.90, tolerance: 0.20);
       case ExerciseType.deadlift:
-        return AngleCalculator.rangeScore(ratio, idealMin: 0.35, idealMax: 0.60, tolerance: 0.20);
+        return AngleCalculator.rangeScore(ratio,
+            idealMin: 0.35, idealMax: 0.60, tolerance: 0.20);
       case ExerciseType.wristCurl:
-        return AngleCalculator.rangeScore(ratio, idealMin: 0.70, idealMax: 0.95, tolerance: 0.20);
+        return AngleCalculator.rangeScore(ratio,
+            idealMin: 0.70, idealMax: 0.95, tolerance: 0.20);
+      case ExerciseType.sidePressure:
+        // 상체 동작 비율 높음 (하체 거의 안 움직임)
+        return AngleCalculator.rangeScore(ratio,
+            idealMin: 0.75, idealMax: 0.95, tolerance: 0.20);
     }
   }
 
-  /// torso orientation 스코어 (스펙 1.2 orientationScore)
+  /// torso orientation 스코어
   double _orientationScore(ExerciseType type, double avgAngle) {
     switch (type) {
       case ExerciseType.squat:
-        return AngleCalculator.rangeScore(avgAngle, idealMin: 10, idealMax: 30, tolerance: 20);
+        return AngleCalculator.rangeScore(avgAngle,
+            idealMin: 10, idealMax: 30, tolerance: 20);
       case ExerciseType.benchPress:
-        return AngleCalculator.rangeScore(avgAngle, idealMin: 70, idealMax: 90, tolerance: 20);
+        return AngleCalculator.rangeScore(avgAngle,
+            idealMin: 70, idealMax: 90, tolerance: 20);
       case ExerciseType.deadlift:
-        return AngleCalculator.rangeScore(avgAngle, idealMin: 30, idealMax: 55, tolerance: 20);
+        return AngleCalculator.rangeScore(avgAngle,
+            idealMin: 30, idealMax: 55, tolerance: 20);
       case ExerciseType.wristCurl:
-        return AngleCalculator.rangeScore(avgAngle, idealMin: 10, idealMax: 40, tolerance: 20);
+        return AngleCalculator.rangeScore(avgAngle,
+            idealMin: 10, idealMax: 40, tolerance: 20);
+      case ExerciseType.sidePressure:
+        // 직립 자세 (torso 거의 수직 = 0~15도)
+        return AngleCalculator.rangeScore(avgAngle,
+            idealMin: 0, idealMax: 15, tolerance: 15);
     }
   }
 }
