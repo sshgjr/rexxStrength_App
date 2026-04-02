@@ -53,20 +53,24 @@ class PoseFrame {
   }
 
   /// BlazePose 랜드마크 인덱스 상수
-  static const int leftShoulder = 11;
-  static const int rightShoulder = 12;
-  static const int leftElbow = 13;
-  static const int rightElbow = 14;
-  static const int leftWrist = 15;
-  static const int rightWrist = 16;
-  static const int leftHip = 23;
-  static const int rightHip = 24;
-  static const int leftKnee = 25;
-  static const int rightKnee = 26;
-  static const int leftAnkle = 27;
-  static const int rightAnkle = 28;
-  static const int leftFootIndex = 31;
+  static const int leftShoulder   = 11;
+  static const int rightShoulder  = 12;
+  static const int leftElbow      = 13;
+  static const int rightElbow     = 14;
+  static const int leftWrist      = 15;
+  static const int rightWrist     = 16;
+  static const int leftPinky      = 17;  // 추가: 왼쪽 새끼손가락
+  static const int rightPinky     = 18;  // 추가: 오른쪽 새끼손가락
+  static const int leftIndex      = 19;  // 왼쪽 검지
+  static const int rightIndex     = 20;  // 오른쪽 검지
+  static const int leftThumb      = 21;  // 추가: 왼쪽 엄지
+  static const int rightThumb     = 22;  // 추가: 오른쪽 엄지
+  static const int leftHip        = 23;
+  static const int rightHip       = 24;
+  static const int leftKnee       = 25;
+  static const int rightKnee      = 26;
+  static const int leftAnkle      = 27;
+  static const int rightAnkle     = 28;
+  static const int leftFootIndex  = 31;
   static const int rightFootIndex = 32;
-  static const int leftIndex = 19;   // 왼쪽 검지
-  static const int rightIndex = 20;  // 오른쪽 검지
 }
