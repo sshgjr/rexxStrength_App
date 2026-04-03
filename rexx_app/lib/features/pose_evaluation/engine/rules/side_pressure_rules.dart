@@ -5,22 +5,17 @@ import '../angle_calculator.dart';
 import 'exercise_rule.dart';
 
 /// 팔씨름 보조 운동 - 사이드프레셔 평가 규칙
-///
-/// [사이드프레셔란?]
-/// 팔씨름 사이드프레셔 기술을 모방한 웨이트 운동.
-/// 덤벨/케이블을 잡고 팔꿈치를 약간 굽힌 상태에서
-/// 손목을 회내(pronation)하며 몸 옆으로 수평 가압하는 동작.
-/// 어깨 외전 + 전완 회내의 복합 움직임.
-///
-/// [핵심 분석 항목]
-/// 1. 손목 회내 (30%) — 사이드프레셔의 핵심. 엄지가 아래를 향하는지
-/// 2. 팔꿈치 각도 (25%) — 70~110도 유지 여부
-/// 3. 어깨 외전 (25%) — 팔이 수평에 가까운지
-/// 4. 상체 기울기 (10%) — 과도한 몸 기울임 여부
-/// 5. 좌우 대칭 (10%) — 어깨 높이 균형
 class SidePressureRules implements ExerciseRule {
   @override
   String get name => '사이드프레셔';
+
+  // ── likelihood 임계값 ─────────────────────────────────────────────────
+  // 주요 관절 (어깨/팔꿈치/손목): 비교적 잘 잡히므로 0.5 유지
+  static const double _mainLandmarkThreshold = 0.5;
+  // 손가락 (엄지/소지): 카메라 각도에 따라 잘 안 잡히므로 낮게 설정
+  static const double _fingerLandmarkThreshold = 0.2;
+  // 손가락 유효 프레임이 전체의 이 비율 이상이어야 회내 점수 신뢰
+  static const double _pronationMinFrameRatio = 0.3;
 
   @override
   List<CriterionResult> evaluate(List<PoseFrame> frames) {
@@ -35,26 +30,38 @@ class SidePressureRules implements ExerciseRule {
 
   // ── 1. 손목 회내 (Wrist Pronation) — 30% ─────────────────────────────
   //
-  // 팔씨름 사이드프레셔의 핵심 동작.
   // ML Kit에서 엄지(thumb)와 소지(pinky)의 Y좌표 차이로 회내 정도를 측정.
   // 화면 좌표계: Y는 아래로 갈수록 증가.
   //   - thumb.y > pinky.y  → 엄지가 아래 (회내) ✅
   //   - thumb.y < pinky.y  → 엄지가 위 (회외) ❌
   //
-  // 팔씨름 관점: 완벽한 고립이 아니어도 회내가 충분하면 긍정 평가.
+  // [변경사항]
+  // - 손가락 likelihood 임계값: 0.5 → 0.2 (카메라 각도 영향 대응)
+  // - likelihood를 가중치로 사용 → 신뢰도 높은 프레임에 더 큰 비중
+  // - 유효 프레임이 전체의 30% 미만이면 중립값 70점 반환 (오탐 방지)
   CriterionResult _evaluateWristPronation(List<PoseFrame> frames) {
-    final scores = <double>[];
+    double weightedScoreSum = 0.0;
+    double weightSum = 0.0;
+    int validFrameCount = 0;
 
     for (final frame in frames) {
-      // 오른팔 기준 (주도 팔) — 추후 side 파라미터로 분기 가능
       final wrist = frame.getLandmark(PoseFrame.rightWrist);
-      final thumb = frame.getLandmark(PoseFrame.rightThumb);
-      final pinky = frame.getLandmark(PoseFrame.rightPinky);
       final elbow = frame.getLandmark(PoseFrame.rightElbow);
 
-      if (wrist == null || thumb == null || pinky == null || elbow == null) {
-        continue;
-      }
+      // 주요 관절은 기존 임계값 유지
+      if (wrist == null || elbow == null) continue;
+      if (wrist.likelihood < _mainLandmarkThreshold) continue;
+      if (elbow.likelihood < _mainLandmarkThreshold) continue;
+
+      final thumb = frame.getLandmark(PoseFrame.rightThumb);
+      final pinky = frame.getLandmark(PoseFrame.rightPinky);
+
+      // 손가락은 낮은 임계값 적용 (0.2)
+      if (thumb == null || pinky == null) continue;
+      if (thumb.likelihood < _fingerLandmarkThreshold) continue;
+      if (pinky.likelihood < _fingerLandmarkThreshold) continue;
+
+      validFrameCount++;
 
       // 엄지-소지 Y 차이 (양수 = 엄지가 아래 = 회내)
       final pronationDiff = thumb.y - pinky.y;
@@ -67,10 +74,6 @@ class SidePressureRules implements ExerciseRule {
 
       final pronationRatio = pronationDiff / wristElbowDist;
 
-      // 채점:
-      //   pronationRatio >= 0.15 (충분한 회내) → 100점
-      //   pronationRatio 0.0~0.15 (약한 회내)  → 선형 증가
-      //   pronationRatio < 0.0 (회외)           → 0점 방향 감점
       double score;
       if (pronationRatio >= 0.15) {
         score = 100.0;
@@ -86,11 +89,26 @@ class SidePressureRules implements ExerciseRule {
         score = (1 + pronationRatio / 0.2).clamp(0.0, 1.0) * 50.0;
       }
 
-      scores.add(score.clamp(0.0, 100.0));
+      // likelihood를 가중치로 사용 — 신뢰도 높은 프레임에 더 큰 비중
+      final weight = (thumb.likelihood + pinky.likelihood) / 2.0;
+      weightedScoreSum += score.clamp(0.0, 100.0) * weight;
+      weightSum += weight;
     }
 
-    final avgScore =
-        scores.isEmpty ? 50.0 : scores.reduce((a, b) => a + b) / scores.length;
+    // 유효 프레임이 전체의 30% 미만 → 측정 신뢰도 부족
+    // 중립값 70점 반환 (회내 오탐 방지)
+    final frameRatio = frames.isEmpty ? 0.0 : validFrameCount / frames.length;
+    if (weightSum < 1e-6 || frameRatio < _pronationMinFrameRatio) {
+      return CriterionResult(
+        name: '손목 회내',
+        description: '손목 회내 측정값 부족 (카메라 각도 영향)',
+        score: 70.0,
+        weight: 0.30,
+        grade: CriterionGrade.fromScore(70.0),
+      );
+    }
+
+    final avgScore = weightedScoreSum / weightSum;
 
     return CriterionResult(
       name: '손목 회내',
@@ -102,11 +120,6 @@ class SidePressureRules implements ExerciseRule {
   }
 
   // ── 2. 팔꿈치 각도 (Elbow Angle) — 25% ──────────────────────────────
-  //
-  // 사이드프레셔에서 팔꿈치는 70~110도를 유지해야 함.
-  //   - 너무 펴면(>120도): 어깨 관절 부담 증가, 레버리지 손실
-  //   - 너무 굽히면(<60도): 전완 회내 가동범위 제한
-  // 이상: 80~100도 / 허용 범위: 70~110도
   CriterionResult _evaluateElbowAngle(List<PoseFrame> frames) {
     final scores = <double>[];
 
@@ -116,10 +129,12 @@ class SidePressureRules implements ExerciseRule {
       final wrist = frame.getLandmark(PoseFrame.rightWrist);
 
       if (shoulder == null || elbow == null || wrist == null) continue;
+      if (shoulder.likelihood < _mainLandmarkThreshold) continue;
+      if (elbow.likelihood < _mainLandmarkThreshold) continue;
+      if (wrist.likelihood < _mainLandmarkThreshold) continue;
 
       final angle = AngleCalculator.calculateAngle(shoulder, elbow, wrist);
 
-      // 이상 80~100도, tolerance 20 (60도 이하 / 120도 이상에서 0점)
       final score = AngleCalculator.rangeScore(
         angle,
         idealMin: 80,
@@ -142,10 +157,6 @@ class SidePressureRules implements ExerciseRule {
   }
 
   // ── 3. 어깨 외전 (Shoulder Abduction) — 25% ─────────────────────────
-  //
-  // 사이드프레셔는 팔을 몸 옆으로 수평 가압하는 동작.
-  // 어깨-팔꿈치 라인이 수평에 가까울수록 힘 전달 효율이 높음.
-  // 힙-어깨-팔꿈치 각도로 측정: 이상 75~95도.
   CriterionResult _evaluateShoulderAbduction(List<PoseFrame> frames) {
     final scores = <double>[];
 
@@ -155,11 +166,12 @@ class SidePressureRules implements ExerciseRule {
       final elbow = frame.getLandmark(PoseFrame.rightElbow);
 
       if (hip == null || shoulder == null || elbow == null) continue;
+      if (hip.likelihood < _mainLandmarkThreshold) continue;
+      if (shoulder.likelihood < _mainLandmarkThreshold) continue;
+      if (elbow.likelihood < _mainLandmarkThreshold) continue;
 
-      // 힙→어깨→팔꿈치 각도: 수직(힙-어깨) 대비 팔의 벌어짐 정도
       final angle = AngleCalculator.calculateAngle(hip, shoulder, elbow);
 
-      // 이상 75~95도, tolerance 20
       final score = AngleCalculator.rangeScore(
         angle,
         idealMin: 75,
@@ -182,10 +194,6 @@ class SidePressureRules implements ExerciseRule {
   }
 
   // ── 4. 상체 기울기 (Trunk Lean) — 10% ───────────────────────────────
-  //
-  // 과도한 상체 기울임은 허리 부담 + 힘 분산.
-  // 어깨 중심-힙 중심 연결선의 수직 기울기로 측정.
-  // 이상: 10도 이내 / 허용: 20도 이내 / 25도 이상: 감점
   CriterionResult _evaluateTrunkLean(List<PoseFrame> frames) {
     final scores = <double>[];
 
@@ -197,8 +205,11 @@ class SidePressureRules implements ExerciseRule {
 
       if (lShoulder == null || rShoulder == null ||
           lHip == null || rHip == null) continue;
+      if (lShoulder.likelihood < _mainLandmarkThreshold) continue;
+      if (rShoulder.likelihood < _mainLandmarkThreshold) continue;
+      if (lHip.likelihood < _mainLandmarkThreshold) continue;
+      if (rHip.likelihood < _mainLandmarkThreshold) continue;
 
-      // 어깨 중심 / 힙 중심
       final shoulderMidX = (lShoulder.x + rShoulder.x) / 2;
       final shoulderMidY = (lShoulder.y + rShoulder.y) / 2;
       final hipMidX = (lHip.x + rHip.x) / 2;
@@ -211,7 +222,6 @@ class SidePressureRules implements ExerciseRule {
 
       final leanDeg = atan2(dx, dy) * 180 / pi;
 
-      // 이상 0~10도, tolerance 15 (25도에서 0점)
       final score = AngleCalculator.rangeScore(
         leanDeg,
         idealMin: 0,
@@ -234,9 +244,6 @@ class SidePressureRules implements ExerciseRule {
   }
 
   // ── 5. 좌우 대칭 (Symmetry) — 10% ───────────────────────────────────
-  //
-  // 어깨 높이 차이로 좌우 균형 측정.
-  // DeadliftRules의 대칭 평가와 동일한 방식.
   CriterionResult _evaluateSymmetry(List<PoseFrame> frames) {
     final scores = <double>[];
 
@@ -248,11 +255,14 @@ class SidePressureRules implements ExerciseRule {
 
       if (lShoulder == null || rShoulder == null ||
           lHip == null || rHip == null) continue;
+      if (lShoulder.likelihood < _mainLandmarkThreshold) continue;
+      if (rShoulder.likelihood < _mainLandmarkThreshold) continue;
+      if (lHip.likelihood < _mainLandmarkThreshold) continue;
+      if (rHip.likelihood < _mainLandmarkThreshold) continue;
 
       final shoulderDiff = AngleCalculator.yDifference(lShoulder, rShoulder);
       final hipDiff = AngleCalculator.yDifference(lHip, rHip);
 
-      // 차이가 0.03 이내면 만점, 0.08 이상이면 0점
       final shoulderScore =
           (1 - (shoulderDiff / 0.08).clamp(0.0, 1.0)) * 100;
       final hipScore =
