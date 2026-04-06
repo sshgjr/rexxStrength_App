@@ -11,7 +11,6 @@ const Color _textMain = Color(0xFFE9F5EF);
 const Color _textSub = Color(0xFFA7B9B0);
 
 /// ambiguous 분류 시 상위 2개 운동 선택 다이얼로그
-/// 반환: 사용자가 선택한 ExerciseType
 Future<ExerciseType?> showAmbiguousDialog(
   BuildContext context,
   ClassificationResult result,
@@ -63,12 +62,10 @@ Future<ExerciseType?> showAmbiguousDialog(
 }
 
 /// 분류 실패 플로우 다이얼로그
-/// 반환: 사용자가 선택한 ExerciseType, 또는 null (비지원 운동 피드백 후)
 Future<ExerciseType?> showClassificationFailedDialog(
   BuildContext context,
   ClassificationResult result,
 ) async {
-  // Step 1: 지원 운동인지 확인
   final isSupportedExercise = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
@@ -92,9 +89,8 @@ Future<ExerciseType?> showClassificationFailedDialog(
               color: _bg,
               borderRadius: BorderRadius.circular(8),
             ),
-            // 사이드프레셔 추가
             child: const Text(
-              '현재 지원: 스쿼트 · 벤치프레스 · 데드리프트 · 리스트컬 · 사이드프레셔',
+              '현재 지원: 스쿼트 · 벤치프레스 · 데드리프트 · 리스트컬 · 사이드프레셔 · 프로네이션컬',
               style: TextStyle(color: _textSub, fontSize: 12),
             ),
           ),
@@ -120,7 +116,7 @@ Future<ExerciseType?> showClassificationFailedDialog(
   if (!context.mounted) return null;
 
   if (isSupportedExercise == true) {
-    // Step 2a: 전체 운동 확률순 선택 (사이드프레셔 자동 포함 — sortedTypes가 ExerciseType.values 기반)
+    // sortedTypes가 ExerciseType.values 기반이라 프로네이션컬 자동 포함
     return showDialog<ExerciseType>(
       context: context,
       barrierDismissible: false,
@@ -159,13 +155,11 @@ Future<ExerciseType?> showClassificationFailedDialog(
       ),
     );
   } else {
-    // Step 2b: 비지원 운동 피드백
     await _showUnsupportedExerciseFeedback(context);
     return null;
   }
 }
 
-/// 비지원 운동 피드백 입력 → 감사 메시지 → 네비게이션 선택
 Future<void> _showUnsupportedExerciseFeedback(BuildContext context) async {
   final controller = TextEditingController();
 
@@ -274,7 +268,6 @@ Future<void> _showUnsupportedExerciseFeedback(BuildContext context) async {
   );
 }
 
-/// SharedPreferences에 비지원 운동 요청 저장
 Future<void> _saveFeedback(String exerciseName) async {
   final prefs = await SharedPreferences.getInstance();
   const key = 'unsupported_exercise_requests';
