@@ -11,7 +11,6 @@ class ExerciseClassifier {
   static const double _w2 = 0.25; // 상하체 비율
   static const double _w3 = 0.40; // torso orientation
 
-  /// 포즈 프레임 리스트로 운동 종류를 분류한다
   ClassificationResult classify(List<PoseFrame> frames) {
     if (frames.length < 5) {
       final count = ExerciseType.values.length;
@@ -50,7 +49,6 @@ class ExerciseClassifier {
     return ClassificationResult(probabilities: probabilities);
   }
 
-  /// 좌/우 중 likelihood가 높은 쪽 선택. true = left, false = right
   static bool chooseSide(List<PoseFrame> frames) {
     int leftWins = 0;
     for (final frame in frames) {
@@ -83,7 +81,7 @@ class ExerciseClassifier {
     return leftWins >= (frames.length / 2).ceil();
   }
 
-  /// ROM 추출: {knee, elbow, hip, wrist, shoulderAbduction}
+  /// ROM 추출: {knee, elbow, hip, wrist, shoulderAbdMin, wristYRange}
   Map<String, double> _extractROMs(List<PoseFrame> frames, bool useLeft) {
     final shoulderIdx = useLeft ? PoseFrame.leftShoulder : PoseFrame.rightShoulder;
     final elbowIdx    = useLeft ? PoseFrame.leftElbow    : PoseFrame.rightElbow;
@@ -97,8 +95,9 @@ class ExerciseClassifier {
     double elbowMin = 180, elbowMax = 0;
     double hipMin = 180, hipMax = 0;
     double wristMin = 180, wristMax = 0;
-    // 사이드프레셔용: 힙-어깨-팔꿈치 각도 (어깨 외전)
     double shoulderAbdMin = 180, shoulderAbdMax = 0;
+    // 프로네이션컬용: 손목 Y좌표 이동 범위 (컬 궤적)
+    double wristYMin = double.infinity, wristYMax = -double.infinity;
 
     for (final frame in frames) {
       final shoulder = frame.getLandmark(shoulderIdx);
@@ -126,24 +125,30 @@ class ExerciseClassifier {
         final a = AngleCalculator.calculateAngle(elbow, wrist, indexFinger);
         wristMin = min(wristMin, a); wristMax = max(wristMax, a);
       }
-      // 어깨 외전: 힙→어깨→팔꿈치 각도
+      // 어깨 외전: 힙→어깨→팔꿈치 각도 (사이드프레셔 분류용)
       if (hip != null && shoulder != null && elbow != null) {
         final a = AngleCalculator.calculateAngle(hip, shoulder, elbow);
         shoulderAbdMin = min(shoulderAbdMin, a);
         shoulderAbdMax = max(shoulderAbdMax, a);
       }
+      // 손목 Y 이동 범위 (프로네이션컬 분류용 — 컬 궤적)
+      if (wrist != null && wrist.likelihood >= 0.5) {
+        wristYMin = min(wristYMin, wrist.y);
+        wristYMax = max(wristYMax, wrist.y);
+      }
     }
 
     return {
-      'knee':            kneeMax > kneeMin       ? kneeMax - kneeMin             : 0,
-      'elbow':           elbowMax > elbowMin     ? elbowMax - elbowMin           : 0,
-      'hip':             hipMax > hipMin         ? hipMax - hipMin               : 0,
-      'wrist':           wristMax > wristMin     ? wristMax - wristMin           : 0,
-      'shoulderAbdMin':  shoulderAbdMin < 180    ? shoulderAbdMin                : 90,
+      'knee':           kneeMax > kneeMin       ? kneeMax - kneeMin   : 0,
+      'elbow':          elbowMax > elbowMin     ? elbowMax - elbowMin : 0,
+      'hip':            hipMax > hipMin         ? hipMax - hipMin     : 0,
+      'wrist':          wristMax > wristMin     ? wristMax - wristMin : 0,
+      'shoulderAbdMin': shoulderAbdMin < 180    ? shoulderAbdMin      : 90,
+      // 손목 Y 이동량 (신체 좌표계 기준, 클수록 컬 범위 큼)
+      'wristYRange':    wristYMax > wristYMin   ? wristYMax - wristYMin : 0,
     };
   }
 
-  /// 상하체 동작 비율 추출
   double _extractMotionRatio(
     List<PoseFrame> frames,
     bool useLeft,
@@ -183,7 +188,7 @@ class ExerciseClassifier {
         ? (hipYMax - hipYMin) / bodyHeight * 100
         : 0.0;
 
-    final wristRom   = roms['wrist'] ?? 0.0;
+    final wristRom    = roms['wrist'] ?? 0.0;
     final upperMotion = roms['elbow']! + wristRom + normalizedShoulderMove;
     final lowerMotion = roms['knee']! + normalizedHipMove;
     final total = upperMotion + lowerMotion;
@@ -191,7 +196,6 @@ class ExerciseClassifier {
     return total > 0 ? upperMotion / total : 0.5;
   }
 
-  /// 평균 torso orientation (수직 기준 각도)
   double _extractTorsoOrientation(List<PoseFrame> frames, bool useLeft) {
     final shoulderIdx = useLeft ? PoseFrame.leftShoulder : PoseFrame.rightShoulder;
     final hipIdx      = useLeft ? PoseFrame.leftHip      : PoseFrame.rightHip;
@@ -227,10 +231,19 @@ class ExerciseClassifier {
         return AngleCalculator.rangeScore(roms['wrist'] ?? 0,
             idealMin: 20, idealMax: 60, tolerance: 20);
       case ExerciseType.sidePressure:
-        // 팔씨름 사이드프레셔: 어깨 외전 각도가 70~100도 범위에 있는지
-        // 팔꿈치 각도 변화는 작고(고정), 어깨 외전이 수평에 가까운 게 특징
+        // 어깨 외전 각도가 수평에 가까운지
         return AngleCalculator.rangeScore(roms['shoulderAbdMin'] ?? 90,
             idealMin: 65, idealMax: 100, tolerance: 25);
+      case ExerciseType.pronationCurl:
+        // 손목 Y 이동량 (컬 궤적) + 팔꿈치 ROM 모두 있어야 함
+        // 사이드프레셔와 달리 손목이 위아래로 크게 움직임
+        final wristYRange = roms['wristYRange'] ?? 0;
+        final elbowRom = roms['elbow'] ?? 0;
+        // 컬 궤적(손목 Y 이동)과 팔꿈치 굴곡 ROM을 합산
+        return AngleCalculator.rangeScore(
+          wristYRange * 200 + elbowRom * 0.3,
+          idealMin: 15, idealMax: 50, tolerance: 15,
+        );
     }
   }
 
@@ -250,9 +263,13 @@ class ExerciseClassifier {
         return AngleCalculator.rangeScore(ratio,
             idealMin: 0.70, idealMax: 0.95, tolerance: 0.20);
       case ExerciseType.sidePressure:
-        // 상체 동작 비율 높음 (하체 거의 안 움직임)
+        // 하체 거의 안 움직임, 상체 비율 높음
         return AngleCalculator.rangeScore(ratio,
             idealMin: 0.75, idealMax: 0.95, tolerance: 0.20);
+      case ExerciseType.pronationCurl:
+        // 상체 주도, 하체 거의 고정 — 리스트컬과 유사하지만 팔꿈치 ROM이 있음
+        return AngleCalculator.rangeScore(ratio,
+            idealMin: 0.65, idealMax: 0.90, tolerance: 0.20);
     }
   }
 
@@ -272,9 +289,13 @@ class ExerciseClassifier {
         return AngleCalculator.rangeScore(avgAngle,
             idealMin: 10, idealMax: 40, tolerance: 20);
       case ExerciseType.sidePressure:
-        // 직립 자세 (torso 거의 수직 = 0~15도)
+        // 직립 자세 (torso 거의 수직)
         return AngleCalculator.rangeScore(avgAngle,
             idealMin: 0, idealMax: 15, tolerance: 15);
+      case ExerciseType.pronationCurl:
+        // 직립 또는 약간 앞으로 — 측면 촬영 기준 직립에 가까움
+        return AngleCalculator.rangeScore(avgAngle,
+            idealMin: 0, idealMax: 20, tolerance: 20);
     }
   }
 }
