@@ -13,7 +13,8 @@ enum ExerciseType {
   benchPress,
   deadlift,
   wristCurl,
-  sidePressure;
+  sidePressure,
+  pronationCurl;
 
   String get displayName {
     switch (this) {
@@ -27,6 +28,8 @@ enum ExerciseType {
         return '리스트컬';
       case ExerciseType.sidePressure:
         return '사이드프레셔';
+      case ExerciseType.pronationCurl:
+        return '프로네이션컬';
     }
   }
 
@@ -42,6 +45,8 @@ enum ExerciseType {
         return 'wrist_curl';
       case ExerciseType.sidePressure:
         return 'side_pressure';
+      case ExerciseType.pronationCurl:
+        return 'pronation_curl';
     }
   }
 
@@ -50,6 +55,7 @@ enum ExerciseType {
     switch (this) {
       case ExerciseType.sidePressure:
       case ExerciseType.wristCurl:
+      case ExerciseType.pronationCurl:
         return true;
       default:
         return false;
