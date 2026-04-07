@@ -291,6 +291,9 @@ class PoseAnalyzer {
         return DeadliftRules();
       case ExerciseType.wristCurl:
         return WristCurlRules();
+            case ExerciseType.sidePressure:
+  // 임시로 일단 break
+  break;
     }
   }
 
