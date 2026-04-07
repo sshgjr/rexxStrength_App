@@ -292,6 +292,10 @@ class PoseAnalyzer {
       case ExerciseType.wristCurl:
         return WristCurlRules();
             case ExerciseType.sidePressure:
+                return sidePressure();
+            case ExerciseType.pronationCurl:
+                return pronationCurl();
+  
   // 임시로 일단 break
   break;
     }
