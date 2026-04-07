@@ -11,22 +11,11 @@ class CriterionScore(BaseModel):
     grade: str
 
 
-class LayerIssue(BaseModel):
-    criterion: str
-    score: float
-    grade: str
-    reason: str
-
-
 class PoseFeedbackRequest(BaseModel):
-    exercise_type: str
+    exercise_type: str  # squat, bench_press, deadlift
     total_score: int
     criteria_scores: List[CriterionScore]
     detected_issues: List[str]
-    # 신규 필드 (하위 호환: 기본값 제공)
-    user_level: str = "beginner"
-    layer1_issues: List[LayerIssue] = []
-    layer2_issues: List[LayerIssue] = []
 
 
 class PoseFeedbackResponse(BaseModel):

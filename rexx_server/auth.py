@@ -37,7 +37,6 @@ class User(Base):
     weight = Column(Float, nullable=True)
     is_body_public = Column(Boolean, default=False, nullable=False)
     interests = Column(Text, nullable=True)  # JSON array string
-    level = Column(String(20), nullable=False, server_default="beginner")  # beginner, intermediate, advanced
 
 
 # =========================

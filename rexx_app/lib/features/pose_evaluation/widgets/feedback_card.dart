@@ -1,26 +1,22 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../services/pose_feedback_service.dart';
-import '../engine/layer_classifier.dart';
 
-/// AI 코칭 피드백 카드 위젯 (3종 구조화 JSON 표시)
+/// AI 코칭 피드백 카드 위젯 (구조화된 JSON 응답 표시)
 class FeedbackCard extends StatelessWidget {
   final String? feedbackText;
   final String offlineFeedback;
   final FeedbackError? error;
-  final LayerClassification? layerClassification;
 
   const FeedbackCard({
     super.key,
     this.feedbackText,
     required this.offlineFeedback,
     this.error,
-    this.layerClassification,
   });
 
   static const Color card = Color(0xFF0F1612);
   static const Color primary = Color(0xFF16A34A);
-  static const Color danger = Color(0xFFEF4444);
   static const Color textMain = Color(0xFFE9F5EF);
   static const Color textSub = Color(0xFFA7B9B0);
 
@@ -29,24 +25,19 @@ class FeedbackCard extends StatelessWidget {
     if (feedbackText == null) return null;
     try {
       final parsed = jsonDecode(feedbackText!);
-      if (parsed is Map<String, dynamic>) {
-        // 3종 포맷 (feedback/keypoint/cause) 또는 구형 포맷 (summary/reason/action/cue)
-        if (parsed.containsKey('feedback') || parsed.containsKey('summary')) {
-          return parsed;
-        }
+      if (parsed is Map<String, dynamic> && parsed.containsKey('summary')) {
+        return parsed;
       }
     } catch (_) {}
     return null;
   }
-
-  bool get _isLayer1 => layerClassification?.hasLayer1 ?? false;
 
   @override
   Widget build(BuildContext context) {
     final parsed = _parseFeedback();
     final isOnline = feedbackText != null;
 
-    // 구조화된 JSON 피드백
+    // 구조화된 JSON 피드백인 경우
     if (parsed != null) {
       return _buildStructuredFeedback(parsed);
     }
@@ -55,68 +46,29 @@ class FeedbackCard extends StatelessWidget {
     return _buildPlainFeedback(isOnline);
   }
 
-  bool _isEmptyFeedback(Map<String, dynamic> data) {
-    final feedback = data['feedback'] as String? ?? '';
-    final keypoint = data['keypoint'] as String? ?? '';
-    return feedback.isEmpty && keypoint.isEmpty;
-  }
-
-  Widget _buildNoIssueFeedback() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      decoration: BoxDecoration(
-        color: primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: primary.withValues(alpha: 0.25)),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.check_circle_outline, color: primary, size: 48),
-          const SizedBox(height: 12),
-          const Text(
-            '자세가 좋습니다!',
-            style: TextStyle(
-              color: textMain,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '현재 자세를 유지하면서 연습하세요.',
-            style: TextStyle(color: textSub, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStructuredFeedback(Map<String, dynamic> data) {
-    // 3종 포맷 우선, 구형 폴백
-    final feedback = data['feedback'] as String? ?? data['summary'] as String? ?? '';
-    final keypoint = data['keypoint'] as String? ?? data['cue'] as String? ?? '';
-    final cause = data['cause'] as String? ?? data['reason'] as String? ?? '';
-
-    final accentColor = _isLayer1 ? danger : primary;
+    final summary = data['summary'] as String? ?? '';
+    final reason = data['reason'] as String? ?? '';
+    final action = data['action'] as String? ?? '';
+    final cue = data['cue'] as String? ?? '';
 
     return Column(
       children: [
-        // 한 줄 키포인트 — 상단 강조
-        if (keypoint.isNotEmpty)
+        // 큐 (한줄 요약) - 상단에 크게 표시
+        if (cue.isNotEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [accentColor, accentColor.withValues(alpha: 0.8)],
+                colors: [primary, primary.withValues(alpha: 0.8)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withValues(alpha: 0.3),
+                  color: primary.withValues(alpha: 0.3),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -124,14 +76,10 @@ class FeedbackCard extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Icon(
-                  _isLayer1 ? Icons.warning_amber_rounded : Icons.format_quote,
-                  color: Colors.white70,
-                  size: 28,
-                ),
+                const Icon(Icons.format_quote, color: Colors.white70, size: 28),
                 const SizedBox(height: 8),
                 Text(
-                  keypoint,
+                  cue,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
@@ -140,40 +88,35 @@ class FeedbackCard extends StatelessWidget {
                     height: 1.3,
                   ),
                 ),
-                if (_isLayer1) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      '⚠️ 부상 위험',
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         const SizedBox(height: 16),
 
-        // 자세 문제 원인
-        if (cause.isNotEmpty)
+        // 요약
+        if (summary.isNotEmpty)
+          _buildSection(
+            icon: Icons.summarize_outlined,
+            title: '요약',
+            content: summary,
+          ),
+        if (summary.isNotEmpty) const SizedBox(height: 12),
+
+        // 원인
+        if (reason.isNotEmpty)
           _buildSection(
             icon: Icons.search,
-            title: '자세 문제 원인',
-            content: cause,
+            title: '원인',
+            content: reason,
           ),
-        if (cause.isNotEmpty) const SizedBox(height: 12),
+        if (reason.isNotEmpty) const SizedBox(height: 12),
 
-        // 피드백 (상세 설명)
-        if (feedback.isNotEmpty)
+        // 실행 방법
+        if (action.isNotEmpty)
           _buildSection(
             icon: Icons.directions_run,
-            title: '피드백',
-            content: feedback,
+            title: '이렇게 해보세요',
+            content: action,
             highlight: true,
           ),
       ],

@@ -43,18 +43,17 @@ def create_feedback(
     current_user: User | None = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
+    # Claude Haiku로 피드백 생성
     feedback_text = generate_feedback(
         exercise_type=data.exercise_type,
         total_score=data.total_score,
         criteria_scores=[c.model_dump() for c in data.criteria_scores],
         detected_issues=data.detected_issues,
-        user_level=data.user_level,
-        layer1_issues=[i.model_dump() for i in data.layer1_issues],
-        layer2_issues=[i.model_dump() for i in data.layer2_issues],
     )
 
     session_id = None
 
+    # 로그인 사용자만 DB 저장
     if current_user is not None:
         evaluation = PoseEvaluation(
             user_id=current_user.id,

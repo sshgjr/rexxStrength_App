@@ -6,8 +6,6 @@ import 'member_page.dart';
 import 'waiting_screen.dart';
 import 'one_rm_page.dart';
 import '../features/pose_evaluation/screens/exercise_select_screen.dart';
-import '../features/pose_evaluation/engine/layer_classifier.dart';
-import '../services/level_service.dart';
 
 class RexxHomeScreen extends StatefulWidget {
   const RexxHomeScreen({super.key});
@@ -418,38 +416,6 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
 
   // 게스트가 회원가입 후 돌아온 경우 로그인 상태 업데이트
 
-  /// 등급 선택 바텀시트 표시
-  Future<void> _showLevelSettingsSheet() async {
-    final levelService = LevelService();
-    final currentLevel = await levelService.getCurrentLevel();
-
-    if (!mounted) return;
-
-    final selected = await showModalBottomSheet<UserLevel>(
-      context: context,
-      backgroundColor: card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => _LevelSettingsSheet(currentLevel: currentLevel),
-    );
-
-    if (selected != null && selected != currentLevel) {
-      await levelService.saveLocalLevel(selected);
-      if (token != null) {
-        await levelService.updateServerLevel(selected, token!);
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('등급이 ${selected.displayName}(으)로 변경되었습니다.'),
-          backgroundColor: primary,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
   Future<void> _handleLoginButton() async {
     if (isLoggedIn) {
       setState(() {
@@ -566,23 +532,6 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
                   ],
                 ),
                 const Spacer(),
-                // 등급 설정 버튼
-                GestureDetector(
-                  onTap: _showLevelSettingsSheet,
-                  child: Container(
-                    padding: const EdgeInsets.all(7),
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.tune_rounded,
-                      color: textSub,
-                      size: 18,
-                    ),
-                  ),
-                ),
                 // 온라인/오프라인 상태 표시
                 GestureDetector(
                   onTap: !_isOnline ? _showOfflineDialog : null,
@@ -1189,152 +1138,6 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// 등급 선택 바텀시트 위젯
-class _LevelSettingsSheet extends StatefulWidget {
-  final UserLevel currentLevel;
-
-  const _LevelSettingsSheet({required this.currentLevel});
-
-  @override
-  State<_LevelSettingsSheet> createState() => _LevelSettingsSheetState();
-}
-
-class _LevelSettingsSheetState extends State<_LevelSettingsSheet> {
-  late UserLevel _selected;
-
-  static const Color primary = Color(0xFF16A34A);
-  static const Color textMain = Color(0xFFE9F5EF);
-  static const Color textSub = Color(0xFFA7B9B0);
-
-  static const _levelDescriptions = {
-    UserLevel.beginner: '자세 교정 피드백을 상세하게 받습니다',
-    UserLevel.intermediate: '부상 위험은 경고, 스타일은 참고 안내',
-    UserLevel.advanced: '부상 위험만 경고, 스타일 피드백 생략',
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = widget.currentLevel;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '코칭 등급 설정',
-              style: TextStyle(
-                color: textMain,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              '등급에 따라 AI 피드백의 상세도가 달라집니다.',
-              style: TextStyle(color: textSub, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            ...UserLevel.values.map((level) => _buildLevelTile(level)),
-            const SizedBox(height: 8),
-            Text(
-              '언제든 변경할 수 있습니다.',
-              style: TextStyle(color: textSub.withValues(alpha: 0.7), fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context, _selected),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: Text(
-                  _selected == widget.currentLevel ? '닫기' : '${_selected.displayName}(으)로 변경',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLevelTile(UserLevel level) {
-    final isSelected = _selected == level;
-    return GestureDetector(
-      onTap: () => setState(() => _selected = level),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? primary.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? primary.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.08),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? primary : textSub,
-                  width: isSelected ? 2 : 1.5,
-                ),
-                color: isSelected ? primary : Colors.transparent,
-              ),
-              child: isSelected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    level.displayName,
-                    style: TextStyle(
-                      color: isSelected ? primary : textMain,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _levelDescriptions[level]!,
-                    style: TextStyle(
-                      color: textSub,
-                      fontSize: 12,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

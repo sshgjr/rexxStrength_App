@@ -1,5 +1,4 @@
 import json
-from enum import Enum
 from typing import Optional, List
 
 from dotenv import load_dotenv
@@ -58,14 +57,6 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-class UserLevelEnum(str, Enum):
-    beginner = "beginner"
-    intermediate = "intermediate"
-    advanced = "advanced"
-
-class UpdateLevelRequest(BaseModel):
-    level: UserLevelEnum
-
 class UserResponse(BaseModel):
     id: int
     username: str
@@ -74,7 +65,6 @@ class UserResponse(BaseModel):
     weight: Optional[float] = None
     is_body_public: bool = False
     interests: Optional[List[str]] = None
-    level: str = "beginner"
 
 class AuthResponse(BaseModel):
     success: bool
@@ -94,7 +84,6 @@ def _user_response(user: User) -> dict:
         "weight": user.weight,
         "is_body_public": user.is_body_public,
         "interests": json.loads(user.interests) if user.interests else None,
-        "level": user.level,
     }
 
 # =========================
@@ -162,20 +151,6 @@ def get_me(current_user: User = Depends(get_current_user)):
         "success": True,
         "user": _user_response(current_user),
     }
-
-# =========================
-# 등급 변경
-# =========================
-@app.put("/me/level")
-def update_level(
-    data: UpdateLevelRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    current_user.level = data.level.value
-    db.commit()
-    db.refresh(current_user)
-    return {"success": True, "level": current_user.level}
 
 # =========================
 # 자세 평가 라우터
