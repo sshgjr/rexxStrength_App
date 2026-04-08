@@ -23,7 +23,7 @@ enum FeedbackError {
   offline,
   /// 로그인 토큰 없음
   noToken,
-  /// 서버에 연결되었으나 API 처리 실패 (Claude API 오류 등)
+  /// 서버에 연결되었으나 API 처리 실패 (Gemini API 오류 등)
   apiError,
   /// 요청 시간 초과
   timeout,

@@ -17,14 +17,14 @@ Flutter App (rexx_app/)                    FastAPI Backend (rexx_server/)
 │ → ML Kit BlazePose          │           │ database.py — SQLAlchemy/SQLite│
 │ → Rule engine (Dart, local) │  online   │ routers/pose_feedback.py     │
 │ → Score shown immediately   │──────────→│   POST /api/pose/feedback    │
-│                             │           │   → Claude Haiku → feedback  │
+│                             │           │   → Gemini → feedback        │
 │ Offline: fallback text      │           │   → stores in pose_evaluations│
 └─────────────────────────────┘           └──────────────────────────────┘
 ```
 
 **Key design decisions:**
 - Pose extraction + scoring run entirely on-device (offline capable)
-- Only text feedback generation requires network (Claude Haiku API)
+- Only text feedback generation requires network (Gemini API)
 - Rule-based scoring via `ExerciseRule` interface — one implementation per exercise type
 - Offline results queued in SharedPreferences, synced when reconnected
 
@@ -71,7 +71,7 @@ flutter test test/path_test.dart  # Run single test file
 - `auth.py` — `User` SQLAlchemy model, JWT creation/validation, password hashing (extracted to avoid circular imports)
 - `database.py` — Shared SQLAlchemy `Base`, `engine`, `get_db()` dependency
 - `routers/pose_feedback.py` — `/api/pose/feedback` and `/api/pose/history`
-- `services/haiku_service.py` — Claude Haiku API call with template fallback
+- `services/gemini_service.py` — Gemini API call with template fallback
 - `models/pose_models.py` — `PoseEvaluation` table (scores stored as JSON text columns)
 - `schemas/pose_schemas.py` — Pydantic request/response models
 
@@ -89,7 +89,7 @@ SECRET_KEY=...                    # JWT signing key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 DATABASE_URL=postgresql://...      # 필수 — Railway PostgreSQL 연결 URL
-ANTHROPIC_API_KEY=sk-ant-...      # Required for AI feedback
+GEMINI_API_KEY=...                # Required for AI feedback
 ```
 
 ## API Endpoints
