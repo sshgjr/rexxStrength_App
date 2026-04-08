@@ -124,12 +124,29 @@ class LevelCalculation:
     per_lift: dict[str, int]       # {"squat": 2, "bench": 1, "deadlift": 2}
 ```
 
-### 산정 불가 케이스
-- 세 종목 모두 미입력
-- 체중 미입력
-- 1RM 입력은 있지만 산정에 필요한 정보 부족
+### 산정 불가 케이스 및 사유 보고
 
-이 경우 `None`을 반환하고, 호출자가 `level="beginner"` + `level_source="default"`로 처리한다.
+`level_calculator.calculate(...)`는 산정이 가능하면 `LevelCalculation`을 반환하고, 불가능하면 다음 dataclass를 반환한다:
+
+```python
+@dataclass
+class LevelCalculationFailure:
+    missing_reasons: list[Literal[
+        "missing_body_weight",   # 체중 정보 없음
+        "no_lift_inputs",        # 1RM 세 종목 모두 미입력
+        "internal_error",        # 표준 테이블 lookup 실패 등 예외
+    ]]
+```
+
+호출자(`POST /me/onboarding`)는 실패를 받으면 `level="beginner"` + `level_source="default"`로 저장하고, `missing_reasons`를 한국어 안내 문구로 매핑해 응답에 포함한다:
+
+| 사유 | 사용자 안내 문구 |
+|---|---|
+| `missing_body_weight` | "체중 정보가 없어 자동 산정을 할 수 없었어요. 회원 페이지에서 체중을 입력하시면 정확한 등급을 받아보실 수 있어요." |
+| `no_lift_inputs` | "3대 중량(스쿼트·벤치·데드리프트)을 한 종목도 입력하지 않으셔서 자동 산정을 할 수 없었어요. 한 종목이라도 입력하시면 등급이 결정돼요." |
+| `internal_error` | "산정 중 일시적인 문제가 발생했어요. 설정에서 다시 시도해보세요." |
+
+여러 사유가 동시에 발생하면 모두 나열한다 (예: 체중 + 1RM 둘 다 없으면 두 줄).
 
 ---
 
@@ -157,7 +174,7 @@ class LevelCalculation:
 3. 산정 가능 → `user.level = result.level`, `user.level_source = "auto"`
 4. 산정 불가 → `user.level = "beginner"`, `user.level_source = "default"`
 
-**Response:**
+**Response (자동 산정 성공):**
 ```json
 {
   "level": "intermediate",
@@ -167,11 +184,32 @@ class LevelCalculation:
   "per_lift": { "squat": 2, "bench": 1, "deadlift": 3 },
   "feedback_style_preview": "중급 사용자에게는 간결한 자세 교정 위주로 피드백을 드려요.",
   "changeable_in_settings": true,
-  "note": null
+  "missing_reasons": []
 }
 ```
 
-체중이 없어 산정을 못 한 경우 `note: "체중 정보가 없어 자동 산정을 건너뛰었어요"`를 포함한다.
+**Response (default fallback):**
+```json
+{
+  "level": "beginner",
+  "level_source": "default",
+  "avg_tier_score": null,
+  "capped_by_experience": false,
+  "per_lift": {},
+  "feedback_style_preview": "초급 사용자에게는 매우 상세한 자세 교정과 친절한 설명을 드려요.",
+  "changeable_in_settings": true,
+  "missing_reasons": [
+    {
+      "code": "missing_body_weight",
+      "message": "체중 정보가 없어 자동 산정을 할 수 없었어요. 회원 페이지에서 체중을 입력하시면 정확한 등급을 받아보실 수 있어요."
+    },
+    {
+      "code": "no_lift_inputs",
+      "message": "3대 중량을 한 종목도 입력하지 않으셔서 자동 산정을 할 수 없었어요. 한 종목이라도 입력하시면 등급이 결정돼요."
+    }
+  ]
+}
+```
 
 ### 4-2. `GET /me/onboarding-status` (신규)
 
@@ -225,7 +263,7 @@ class LevelCalculation:
 
 완료 액션: `POST /me/onboarding` 호출 → 응답 받아 Step 5로.
 
-**Step 5: 결과 화면**
+**Step 5-A: 결과 화면 (자동 산정 성공)**
 ```
 회원님의 코칭 등급은
 
@@ -242,7 +280,34 @@ class LevelCalculation:
 [확인]
 ```
 
-"나중에" 스킵 경로에서는 결과 화면 대신 "초급으로 시작합니다, 설정에서 언제든 변경 가능합니다" 안내 후 홈으로 이동한다.
+**Step 5-B: 결과 화면 (default fallback — 정보 부족)**
+```
+회원님은 일단
+
+    🥉 초급으로
+
+시작할게요
+
+ℹ️ 자동 산정을 못 한 이유:
+  • 3대 중량을 한 종목도
+    입력하지 않으셨어요.
+    한 종목이라도 입력하시면
+    등급이 결정돼요.
+  • (체중이 없으면 추가 안내)
+
+📝 초급 사용자에게는 매우 상세한
+   자세 교정과 친절한 설명을 드려요.
+
+⚙️ 언제든지 [설정]에서
+   정보를 채우거나 등급을
+   변경할 수 있어요
+
+[확인]
+```
+
+`level_source`가 `"auto"`면 5-A, `"default"`면 5-B를 표시한다. 5-B는 응답의 `missing_reasons[].message`를 그대로 불릿으로 렌더링한다.
+
+"나중에 (초급자로 설정)" 버튼을 눌러 명시적으로 스킵한 경우에도 같은 5-B 화면을 보여주되, `missing_reasons` 대신 "직접 건너뛰기를 선택하셨어요" 한 줄 메시지를 표시한다 (이를 위해 백엔드는 스킵 호출인지 구분할 수 있도록 빈 본문 vs 모든 필드 명시 null을 동일 처리하고, 클라이언트에서 표시 분기).
 
 ---
 
@@ -284,8 +349,8 @@ class LevelCalculation:
 |---|---|
 | 음수/0/비현실적 1RM (예: 1000kg) | Pydantic validator로 거부 → 400 + 한국어 메시지 |
 | 출생연도 1900 미만 또는 미래 | Pydantic validator로 거부 → 400 |
-| 체중 미입력 + 1RM 입력됨 | 산정 불가, default 처리 + `note` 응답 포함 |
-| `level_calculator` 내부 예외 | try/except로 감싸 default fallback. 서버 로그 + 200 응답 |
+| 체중 미입력 + 1RM 입력됨 | 산정 불가, default 처리 + `missing_reasons: ["missing_body_weight"]` 응답 포함 |
+| `level_calculator` 내부 예외 | try/except로 감싸 default fallback. 서버 로그 + 200 응답 + `missing_reasons: ["internal_error"]` |
 | 마이그레이션 실패 (이미 컬럼 존재) | `IF NOT EXISTS` 또는 try/except로 부팅 차단 방지 |
 | 같은 유저가 두 번 onboarding 호출 | 멱등 — 마지막 호출 결과로 덮어쓰기 |
 
@@ -310,16 +375,19 @@ class LevelCalculation:
 - `lt_6m` + Advanced 1RM → 초급으로 강제
 - `6m_2y` + Elite 1RM → 중급으로 강제
 - 부분 입력 (스쿼트만) → 한 종목 기준 산정
-- 모두 None → `None` 반환
-- 체중 None → `None` 반환
+- 모두 None → `LevelCalculationFailure(missing_reasons=["no_lift_inputs"])` 반환
+- 체중 None + 1RM 일부 있음 → `LevelCalculationFailure(missing_reasons=["missing_body_weight"])` 반환
+- 체중 None + 1RM 전부 None → `LevelCalculationFailure(missing_reasons=["missing_body_weight", "no_lift_inputs"])` 반환 (둘 다 나열)
 - 성별 None → male 표준 사용
 - 체중 30kg / 200kg → clamp 동작
 - 컷오프 경계: 1.99→초급, 2.0→중급, 3.49→중급, 3.5→상급
 
 **`tests/test_onboarding_endpoint.py`**
 - 정상 전체 입력 → 200 + auto
-- 모두 null → 200 + default
-- 부분 입력 → 200 + auto
+- 모두 null → 200 + default + `missing_reasons` 두 사유 포함
+- 체중만 null + 1RM 입력 → 200 + default + `missing_body_weight` 단독
+- 체중 있음 + 1RM 셋 다 null → 200 + default + `no_lift_inputs` 단독
+- 부분 입력 (체중 + 1RM 일부) → 200 + auto + `missing_reasons` 빈 배열
 - 음수 1RM → 400
 - 비현실적 출생연도 → 400
 - 인증 없음 → 401
@@ -334,9 +402,11 @@ class LevelCalculation:
 
 **`test/onboarding_flow_test.dart`**
 - 5단계 PageView 네비게이션
-- "나중에 (초급자로 설정)" → 모두 null POST + 홈 라우팅
+- "나중에 (초급자로 설정)" → 모두 null POST + Step 5-B 표시 ("직접 건너뛰기" 메시지)
 - "모름" 체크 시 1RM 필드 비활성 + null 전송
-- Step 5 결과가 응답값 정확히 표시
+- Step 5-A: 자동 산정 응답이 등급/게이지/피드백 안내 정확히 표시
+- Step 5-B: `missing_reasons` 배열의 message가 불릿 리스트로 정확히 렌더링됨
+- 응답에 `missing_reasons`가 두 개 있을 때 두 줄 모두 표시
 
 **`test/level_settings_test.dart`**
 - Member 페이지 등급 라디오 → PUT + `level_source="manual"`
