@@ -5,31 +5,13 @@ import '../angle_calculator.dart';
 import 'exercise_rule.dart';
 
 /// 팔씨름 보조 운동 - 프로네이션컬 평가 규칙
-///
-/// [프로네이션컬이란?]
-/// 케이블/덤벨/원판을 손으로 잡고 컬 동작을 수행하면서
-/// 동시에 손목을 회외(supination) → 회내(pronation)로 회전시키는 운동.
-/// 팔씨름 훅/탑롤 전환 시 필요한 전완 회내근 강화가 목적.
-///
-/// [평가 철학]
-/// - 팔꿈치를 몸에 붙여 고립하는 운동이 아님
-/// - 손으로 중량을 뽑는 궤적(컬 호)이 핵심
-/// - 엄지에 하중이 걸리면서 회내가 진행되는지가 가장 중요
-///
-/// [핵심 분석 항목]
-/// 1. 손목 회내 변화량 (35%) — 동작 중 엄지가 위→아래로 얼마나 회전했는지
-/// 2. 중량 컨트롤 안정성 (25%) — 손목/손 궤적의 흔들림 (과중량 감지)
-/// 3. 컬 궤적 완성도 (20%) — 손목이 일정한 호를 그리며 올라오는지
-/// 4. 손목 안정성 (10%) — 회내 시 손목이 과도하게 꺾이지 않는지
-/// 5. 좌우 대칭 (10%) — 양팔 어깨 높이 균형
 class PronationCurlRules implements ExerciseRule {
   @override
   String get name => '프로네이션컬';
 
-  // ── likelihood 임계값 ─────────────────────────────────────────────────
-  static const double _mainThreshold = 0.5;    // 주요 관절
-  static const double _fingerThreshold = 0.2;  // 손가락 (측면 촬영 시 잘 안 잡힘)
-  static const double _minFrameRatio = 0.3;    // 유효 프레임 최소 비율
+  static const double _mainThreshold = 0.5;
+  static const double _fingerThreshold = 0.2;
+  static const double _minFrameRatio = 0.3;
 
   @override
   List<CriterionResult> evaluate(List<PoseFrame> frames) {
@@ -42,21 +24,9 @@ class PronationCurlRules implements ExerciseRule {
     ];
   }
 
-  // ── 1. 손목 회내 변화량 (Pronation Change) — 35% ─────────────────────
-  //
-  // 프로네이션컬의 핵심: 동작 시작(하단)과 끝(상단)에서
-  // 엄지 방향이 얼마나 바뀌었는지 (회외→회내 변화량)를 측정.
-  //
-  // 측면 촬영 기준:
-  //   - 엄지(thumb)와 소지(pinky)의 Y좌표 차이로 회내 정도 측정
-  //   - 시작: thumb.y < pinky.y (엄지 위 = 회외) 또는 중립
-  //   - 끝:   thumb.y > pinky.y (엄지 아래 = 회내)
-  //
-  // 평가:
-  //   - 변화량이 클수록 (회외→회내 전환) 좋은 점수
-  //   - 처음부터 끝까지 회내 상태 유지도 긍정 평가 (의도된 수행)
+  // ── 1. 엄지 방향 전환 (Pronation Change) — 35% ──────────────────────
   CriterionResult _evaluatePronationChange(List<PoseFrame> frames) {
-    final pronationRatios = <double>[];  // 프레임별 회내 비율
+    final pronationRatios = <double>[];
     int validFrames = 0;
 
     for (final frame in frames) {
@@ -79,71 +49,69 @@ class PronationCurlRules implements ExerciseRule {
       );
       if (wristElbowDist < 1e-6) continue;
 
-      // 양수 = 엄지 아래 = 회내, 음수 = 엄지 위 = 회외
       final pronationRatio = (thumb.y - pinky.y) / wristElbowDist;
       pronationRatios.add(pronationRatio);
     }
 
-    // 유효 프레임 부족 시 중립값
     final frameRatio = frames.isEmpty ? 0.0 : validFrames / frames.length;
     if (pronationRatios.length < 3 || frameRatio < _minFrameRatio) {
       return CriterionResult(
-        name: '손목 회내',
-        description: '손목 회내 측정값 부족 (카메라 각도 영향)',
+        name: '엄지 방향 전환',
+        description: '측정값 부족 (카메라 각도 영향) | 엄지 방향 측정 불가 | 측면 촬영 권장',
         score: 65.0,
         weight: 0.35,
         grade: CriterionGrade.fromScore(65.0),
       );
     }
 
-    // 동작 구간 분리: 하단(첫 30%), 상단(마지막 30%)
     final bottomCount = (pronationRatios.length * 0.3).ceil();
     final topCount = (pronationRatios.length * 0.3).ceil();
-
     final bottomRatios = pronationRatios.take(bottomCount).toList();
-    final topRatios = pronationRatios
-        .skip(pronationRatios.length - topCount)
-        .toList();
+    final topRatios = pronationRatios.skip(pronationRatios.length - topCount).toList();
 
     final bottomAvg = bottomRatios.reduce((a, b) => a + b) / bottomRatios.length;
     final topAvg = topRatios.reduce((a, b) => a + b) / topRatios.length;
-
-    // 회내 변화량: 상단 - 하단 (클수록 좋음)
     final pronationChange = topAvg - bottomAvg;
-
-    // 동작 전체의 최대 회내 값 (얼마나 깊게 회내했는지)
     final maxPronation = pronationRatios.reduce((a, b) => a > b ? a : b);
 
-    double score;
+    // 퍼센트로 변환 (0~100 스케일)
+    final changePercent = (pronationChange * 100).clamp(-100.0, 100.0).round();
+    final maxPercent = (maxPronation * 100).clamp(-100.0, 100.0).round();
 
+    double score;
     if (pronationChange >= 0.2 && maxPronation >= 0.15) {
-      // 이상적: 회외→회내 전환이 충분하고 최대 회내도 좋음
       score = 100.0;
     } else if (pronationChange >= 0.1 || maxPronation >= 0.15) {
-      // 양호: 어느 정도 변화 있거나 회내 자체는 충분
       score = 70.0 + (pronationChange.clamp(0.0, 0.2) / 0.2) * 30.0;
     } else if (pronationChange >= 0.0) {
-      // 약한 변화: 회내가 일어나긴 하지만 부족
       score = 40.0 + (pronationChange / 0.1) * 30.0;
     } else {
-      // 변화 없음 또는 역방향: 회내가 안 일어남
       score = (1 + pronationChange / 0.2).clamp(0.0, 1.0) * 40.0;
     }
 
-    // 디테일 문구 생성
+    // LLM이 활용할 수 있는 풍부한 detail
     final String detail;
     if (maxPronation >= 0.15 && pronationChange >= 0.15) {
-      detail = '회내 전환 충분 — 엄지가 아래를 향하며 전완 회내근이 잘 활성화되고 있어요';
+      detail = '엄지 방향 전환 충분 | 시작~끝 변화량 $changePercent% | 최대 엄지 아래 방향 $maxPercent% | '
+          '컬 올라가면서 엄지가 바닥을 잘 향하고 있음 | 팔씨름 훅 전환 패턴과 일치 | '
+          '추천: 현재 중량 유지, 엄지가 완전히 바닥을 향한 지점에서 3초 버티기 추가';
     } else if (maxPronation >= 0.15) {
-      detail = '회내 자세는 나오지만 전환 타이밍이 늦어요 — 컬 시작 시점부터 회내를 시작해보세요';
+      detail = '엄지 최대 방향은 나오지만 전환 타이밍 늦음 | 변화량 $changePercent% | 최대 $maxPercent% | '
+          '컬 끝 부분에서만 엄지가 아래를 향함 | 컬 시작할 때부터 엄지를 돌려야 함 | '
+          '추천: 중량 유지, 컬 시작 순간부터 엄지 돌리기 의식적으로 연습';
     } else if (pronationChange >= 0.1) {
-      detail = '회내 변화는 있지만 충분하지 않아요 — 엄지를 더 아래로 돌려보세요';
+      detail = '엄지 방향 전환 약함 | 변화량 $changePercent% | 최대 $maxPercent% | '
+          '엄지가 중간 정도만 아래를 향함 | 엄지를 더 바닥 방향으로 돌리는 힘이 부족 | '
+          '추천: 중량 10~20% 감소, 엄지 바닥 방향 집중 훈련';
     } else {
-      detail = '손목 회내 변화가 거의 없어요 — 동작 중 엄지를 바닥 방향으로 돌리는 게 핵심이에요';
+      detail = '엄지 방향 전환 거의 없음 | 변화량 $changePercent% | 최대 $maxPercent% | '
+          '컬 동작 중 엄지가 위 또는 옆을 향한 채로 끝남 | '
+          '엄지를 바닥 방향으로 돌리는 근육이 거의 쓰이지 않음 | '
+          '추천: 중량 30% 이상 감소, 손목 45도 안쪽 굽힌 후 엄지 바닥 방향 전환 집중';
     }
 
     return CriterionResult(
-      name: '손목 회내',
+      name: '엄지 방향 전환',
       description: detail,
       score: score.clamp(0.0, 100.0),
       weight: 0.35,
@@ -151,27 +119,18 @@ class PronationCurlRules implements ExerciseRule {
     );
   }
 
-  // ── 2. 중량 컨트롤 안정성 (Weight Control) — 25% ─────────────────────
-  //
-  // 손목 위치의 궤적 안정성으로 중량 컨트롤 여부를 측정.
-  // 과중량이면 손목 궤적이 흔들리거나 비선형적으로 움직임.
-  //
-  // 측정 방법:
-  //   - 연속 프레임 간 손목 속도 변화량 (가속도) 계산
-  //   - 신체 높이 대비 정규화
-  //   - 급격한 변화 = 컨트롤 부족 = 과중량 신호
+  // ── 2. 중량 컨트롤 (Weight Control) — 25% ───────────────────────────
   CriterionResult _evaluateWeightControl(List<PoseFrame> frames) {
     if (frames.length < 3) {
       return CriterionResult(
         name: '중량 컨트롤',
-        description: '중량 컨트롤 측정을 위한 프레임 부족',
+        description: '프레임 부족으로 측정 불가 | 영상 길이 부족',
         score: 50.0,
         weight: 0.25,
         grade: CriterionGrade.warning,
       );
     }
 
-    // 신체 높이 계산 (어깨-힙 거리)
     double bodyHeight = 1.0;
     for (final frame in frames) {
       final shoulder = frame.getLandmark(PoseFrame.rightShoulder);
@@ -184,7 +143,6 @@ class PronationCurlRules implements ExerciseRule {
       }
     }
 
-    // 손목 위치 수집
     final wristPositions = <List<double>>[];
     for (final frame in frames) {
       final wrist = frame.getLandmark(PoseFrame.rightWrist);
@@ -196,14 +154,13 @@ class PronationCurlRules implements ExerciseRule {
     if (wristPositions.length < 3) {
       return CriterionResult(
         name: '중량 컨트롤',
-        description: '손목 랜드마크 부족',
+        description: '손목 랜드마크 부족으로 측정 불가',
         score: 50.0,
         weight: 0.25,
         grade: CriterionGrade.warning,
       );
     }
 
-    // 연속 프레임 간 속도 계산
     final velocities = <double>[];
     for (int i = 1; i < wristPositions.length; i++) {
       final dx = wristPositions[i][0] - wristPositions[i - 1][0];
@@ -211,7 +168,6 @@ class PronationCurlRules implements ExerciseRule {
       velocities.add(sqrt(dx * dx + dy * dy) / bodyHeight);
     }
 
-    // 속도 변화량 (가속도) — 급격한 변화 = 컨트롤 부족
     final accelerations = <double>[];
     for (int i = 1; i < velocities.length; i++) {
       accelerations.add((velocities[i] - velocities[i - 1]).abs());
@@ -229,11 +185,7 @@ class PronationCurlRules implements ExerciseRule {
 
     final avgAcceleration =
         accelerations.reduce((a, b) => a + b) / accelerations.length;
-    final maxAcceleration = accelerations.reduce((a, b) => a > b ? a : b);
 
-    // 정규화된 가속도 기반 점수
-    // avgAcceleration < 0.01: 매우 안정적 → 100점
-    // avgAcceleration > 0.05: 불안정 → 0점
     final stabilityScore = AngleCalculator.rangeScore(
       avgAcceleration * 1000,
       idealMin: 0,
@@ -243,13 +195,21 @@ class PronationCurlRules implements ExerciseRule {
 
     final String detail;
     if (avgAcceleration < 0.01) {
-      detail = '중량 컨트롤 안정적 — 손목 궤적이 일정해요';
+      detail = '중량 컨트롤 매우 안정적 | 손목 궤적 흔들림 없음 | '
+          '현재 중량이 적절하거나 여유 있음 | 중량 증가 가능 | '
+          '추천: 현재 중량에서 엄지 방향 전환 완성 후 중량 5~10% 증가';
     } else if (avgAcceleration < 0.03) {
-      detail = '중량 컨트롤 양호 — 약간의 흔들림이 있지만 허용 범위예요';
+      detail = '중량 컨트롤 양호 | 약간의 손목 궤적 흔들림 있지만 허용 범위 | '
+          '현재 중량이 적절한 수준 | '
+          '추천: 현재 중량 유지하며 엄지 방향 전환에 집중';
     } else if (avgAcceleration < 0.05) {
-      detail = '중량이 다소 무거워 보여요 — 손목 궤적이 흔들리고 있어요';
+      detail = '중량이 다소 무거움 | 손목 궤적 흔들림 감지 | '
+          '엄지 방향 전환 동작을 수행할 여유가 줄어드는 상태 | '
+          '추천: 중량 15~20% 감소 후 엄지 방향 전환 패턴 먼저 확립';
     } else {
-      detail = '중량이 너무 무거워요 — 손목이 흔들려서 회내 동작이 제대로 안 나올 수 있어요';
+      detail = '중량이 과함 | 손목 궤적 심한 흔들림 | '
+          '엄지를 바닥 방향으로 돌리는 동작 자체가 불가능한 중량 | '
+          '추천: 중량 30% 이상 감소 필수, 가벼운 무게로 패턴 재확립';
     }
 
     return CriterionResult(
@@ -261,14 +221,7 @@ class PronationCurlRules implements ExerciseRule {
     );
   }
 
-  // ── 3. 컬 궤적 완성도 (Curl Arc) — 20% ──────────────────────────────
-  //
-  // 손목이 일정한 호를 그리며 올라오는지 측정.
-  // 측면 촬영 기준: 손목의 Y좌표가 꾸준히 감소(위로)해야 함.
-  //
-  // 평가:
-  //   - 손목 Y좌표의 최저점 → 최고점 이동량 (컬 ROM)
-  //   - 중간에 역방향 움직임이 있으면 감점 (반동 신호)
+  // ── 3. 컬 궤적 완성도 (Curl Arc) — 20% ─────────────────────────────
   CriterionResult _evaluateCurlArc(List<PoseFrame> frames) {
     final wristYPositions = <double>[];
 
@@ -282,14 +235,13 @@ class PronationCurlRules implements ExerciseRule {
     if (wristYPositions.length < 4) {
       return CriterionResult(
         name: '컬 궤적',
-        description: '컬 궤적 측정을 위한 프레임 부족',
+        description: '프레임 부족으로 컬 궤적 측정 불가',
         score: 50.0,
         weight: 0.20,
         grade: CriterionGrade.warning,
       );
     }
 
-    // 신체 높이 (정규화용)
     double bodyHeight = 1.0;
     for (final frame in frames) {
       final shoulder = frame.getLandmark(PoseFrame.rightShoulder);
@@ -304,42 +256,45 @@ class PronationCurlRules implements ExerciseRule {
 
     final maxY = wristYPositions.reduce((a, b) => a > b ? a : b);
     final minY = wristYPositions.reduce((a, b) => a < b ? a : b);
-
-    // 컬 가동범위 (신체 높이 대비)
     final curlRom = (maxY - minY) / bodyHeight;
+    final curlRomPercent = (curlRom * 100).round();
 
-    // 역방향 움직임 횟수 계산 (반동 감지)
     int directionChanges = 0;
     for (int i = 1; i < wristYPositions.length - 1; i++) {
       final prev = wristYPositions[i] - wristYPositions[i - 1];
       final next = wristYPositions[i + 1] - wristYPositions[i];
-      // 방향이 바뀌고 변화량이 유의미한 경우
       if (prev * next < 0 && prev.abs() > 0.005 && next.abs() > 0.005) {
         directionChanges++;
       }
     }
 
-    // ROM 점수 (신체 대비 15% 이상 움직임이면 충분)
     final romScore = AngleCalculator.rangeScore(
       curlRom * 100,
       idealMin: 15,
       idealMax: 40,
       tolerance: 15,
     );
-
-    // 반동 페널티
     final reversalPenalty = (directionChanges * 10).clamp(0, 40).toDouble();
     final finalScore = (romScore - reversalPenalty).clamp(0.0, 100.0);
 
     final String detail;
     if (curlRom >= 0.15 && directionChanges <= 2) {
-      detail = '컬 궤적이 부드럽고 안정적이에요 — 손목이 일정한 호를 그리고 있어요';
+      detail = '컬 궤적 안정적 | 손목 이동 범위 신체 대비 $curlRomPercent% | 반동 횟수 $directionChanges회 | '
+          '손목이 일정한 호를 그리며 올라옴 | 중량 컨트롤 여유 있음 | '
+          '추천: 현재 컬 궤적 유지하며 엄지 방향 전환 추가';
     } else if (curlRom >= 0.15 && directionChanges > 2) {
-      detail = '컬 범위는 충분하지만 중간에 반동이 감지돼요 — 천천히 컨트롤하며 올려보세요';
-    } else if (curlRom < 0.15) {
-      detail = '컬 가동범위가 짧아요 — 손목을 더 높이 끌어올려 Full ROM으로 수행해보세요';
+      detail = '컬 범위는 충분하지만 반동 과다 | 이동 범위 $curlRomPercent% | 반동 $directionChanges회 감지 | '
+          '반동으로 중량을 올리는 경향 있음 | 엄지 방향 전환 동작 방해 | '
+          '추천: 천천히 컨트롤하며 올리기, 반동 없이 순수 근력으로 수행';
+    } else if (curlRom < 0.10) {
+      detail = '컬 가동범위 매우 짧음 | 이동 범위 $curlRomPercent% | '
+          '부분 가동범위 수행 — 팔씨름 실전 패턴과 유사 | '
+          '이 구간에서 엄지 방향 전환이 완성되면 실전 훅 힘에 직접 연결 | '
+          '추천: 현재 구간 유지하며 엄지 방향 전환 폭발적으로 반복';
     } else {
-      detail = '컬 궤적이 불규칙해요 — 중량을 줄이고 일정한 속도로 올려보세요';
+      detail = '컬 가동범위 부족 | 이동 범위 $curlRomPercent% | '
+          '손목을 더 높이 끌어올리면 전완 전체가 동원됨 | '
+          '추천: 손목을 끝까지 끌어올리는 연습 추가';
     }
 
     return CriterionResult(
@@ -351,11 +306,7 @@ class PronationCurlRules implements ExerciseRule {
     );
   }
 
-  // ── 4. 손목 안정성 (Wrist Stability) — 10% ───────────────────────────
-  //
-  // 회내 동작 중 손목이 과도하게 꺾이지 않는지 측정.
-  // 팔꿈치-손목-손가락(index) 각도로 손목 굴곡/신전 여부 확인.
-  // 엄지에 하중이 걸릴 때 손목이 뒤로 꺾이면 부상 위험.
+  // ── 4. 손목 안정성 (Wrist Stability) — 10% ──────────────────────────
   CriterionResult _evaluateWristStability(List<PoseFrame> frames) {
     final wristAngles = <double>[];
 
@@ -369,7 +320,6 @@ class PronationCurlRules implements ExerciseRule {
       if (wrist.likelihood < _mainThreshold) continue;
       if (index.likelihood < _fingerThreshold) continue;
 
-      // 팔꿈치-손목-검지 각도 (180도에 가까울수록 손목이 중립)
       final angle = AngleCalculator.calculateAngle(elbow, wrist, index);
       wristAngles.add(angle);
     }
@@ -377,45 +327,38 @@ class PronationCurlRules implements ExerciseRule {
     if (wristAngles.isEmpty) {
       return CriterionResult(
         name: '손목 안정성',
-        description: '손목 안정성 측정값 부족',
+        description: '손목 안정성 측정값 부족 | 카메라 각도 영향',
         score: 65.0,
         weight: 0.10,
         grade: CriterionGrade.fromScore(65.0),
       );
     }
 
-    // 손목 각도의 표준편차 (변동이 클수록 불안정)
     final avg = wristAngles.reduce((a, b) => a + b) / wristAngles.length;
     final variance = wristAngles
         .map((a) => pow(a - avg, 2))
         .reduce((a, b) => a + b) / wristAngles.length;
     final stdDev = sqrt(variance);
+    final avgRound = avg.round();
 
-    // 평균 각도 기반 점수 (150~180도가 이상적)
-    final angleScore = AngleCalculator.rangeScore(
-      avg,
-      idealMin: 150,
-      idealMax: 180,
-      tolerance: 30,
-    );
-
-    // 변동성 페널티 (표준편차 20 이상이면 불안정)
-    final stabilityScore = AngleCalculator.rangeScore(
-      stdDev,
-      idealMin: 0,
-      idealMax: 10,
-      tolerance: 20,
-    );
-
+    final angleScore = AngleCalculator.rangeScore(avg, idealMin: 150, idealMax: 180, tolerance: 30);
+    final stabilityScore = AngleCalculator.rangeScore(stdDev, idealMin: 0, idealMax: 10, tolerance: 20);
     final finalScore = (angleScore * 0.6 + stabilityScore * 0.4).clamp(0.0, 100.0);
 
     final String detail;
     if (avg >= 150 && stdDev <= 15) {
-      detail = '손목이 중립을 잘 유지하고 있어요 — 엄지에 하중이 안정적으로 걸리고 있어요';
-    } else if (avg < 150) {
-      detail = '손목이 뒤로 꺾이는 경향이 있어요 — 손목을 중립으로 세우고 엄지 방향으로 힘을 실어보세요';
+      detail = '손목 안정적 | 평균 손목 각도 $avgRound도 (중립) | 변동폭 ${stdDev.round()}도 | '
+          '엄지에 하중이 안정적으로 걸리고 있음 | 손목 꺾임 없음 | '
+          '추천: 현재 손목 자세 유지하며 엄지 방향 전환에 집중';
+    } else if (avg < 140) {
+      detail = '손목 뒤로 꺾임 | 평균 손목 각도 $avgRound도 | '
+          '엄지에 하중이 제대로 안 걸리고 손목 부상 위험 | '
+          '손목을 중립으로 세운 후 엄지 방향으로 힘을 실어야 함 | '
+          '추천: 중량 감소 후 손목 45도 안쪽으로 굽힌 중립 자세에서 시작';
     } else {
-      detail = '손목 각도가 불규칙하게 변하고 있어요 — 중량을 줄이고 손목을 고정해보세요';
+      detail = '손목 각도 불규칙 | 평균 $avgRound도 | 변동폭 ${stdDev.round()}도 (큰 편) | '
+          '중량이 무거워 손목이 흔들리는 상태 | '
+          '추천: 중량 감소 후 손목 고정 연습';
     }
 
     return CriterionResult(
@@ -427,9 +370,7 @@ class PronationCurlRules implements ExerciseRule {
     );
   }
 
-  // ── 5. 좌우 대칭 (Symmetry) — 10% ───────────────────────────────────
-  //
-  // 어깨/힙 높이 차이로 좌우 균형 측정.
+  // ── 5. 좌우 대칭 (Symmetry) — 10% ──────────────────────────────────
   CriterionResult _evaluateSymmetry(List<PoseFrame> frames) {
     final scores = <double>[];
 
@@ -451,16 +392,27 @@ class PronationCurlRules implements ExerciseRule {
 
       final shoulderScore = (1 - (shoulderDiff / 0.08).clamp(0.0, 1.0)) * 100;
       final hipScore = (1 - (hipDiff / 0.08).clamp(0.0, 1.0)) * 100;
-
       scores.add((shoulderScore + hipScore) / 2);
     }
 
     final avgScore =
         scores.isEmpty ? 50.0 : scores.reduce((a, b) => a + b) / scores.length;
 
+    final String detail;
+    if (avgScore >= 80) {
+      detail = '좌우 균형 좋음 | 어깨 높이 차이 최소 | 양팔 균형 훈련 유지';
+    } else if (avgScore >= 60) {
+      detail = '좌우 약간 불균형 | 한쪽 어깨가 올라가는 경향 | '
+          '추천: 거울 보며 수행하거나 양팔 교대 훈련';
+    } else {
+      detail = '좌우 불균형 | 어깨 높이 차이 큼 | '
+          '한쪽에 과도한 보상 움직임 발생 | '
+          '추천: 단팔로 교대 훈련, 약한 쪽 집중 강화';
+    }
+
     return CriterionResult(
       name: '좌우 대칭',
-      description: '좌우 대칭',
+      description: detail,
       score: avgScore,
       weight: 0.10,
       grade: CriterionGrade.fromScore(avgScore),
