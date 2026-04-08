@@ -24,14 +24,29 @@ class FeedbackCard extends StatelessWidget {
   static const Color textMain = Color(0xFFE9F5EF);
   static const Color textSub = Color(0xFFA7B9B0);
 
-  /// feedbackText를 JSON으로 파싱 시도
+  /// feedbackText를 JSON으로 파싱 시도 (방어적)
+  /// - Map dynamic 케이스 대응
+  /// - 앞뒤 공백/BOM 제거
+  /// - 이중 인코딩 대응 (String이 또 JSON 문자열인 경우)
   Map<String, dynamic>? _parseFeedback() {
     if (feedbackText == null) return null;
     try {
-      final parsed = jsonDecode(feedbackText!);
-      if (parsed is Map<String, dynamic>) {
-        // 3종 포맷 (feedback/keypoint/cause) 또는 구형 포맷 (summary/reason/action/cue)
-        if (parsed.containsKey('feedback') || parsed.containsKey('summary')) {
+      // 1차 파싱
+      final trimmed = feedbackText!.trim();
+      dynamic decoded = jsonDecode(trimmed);
+
+      // 이중 인코딩 대응: 결과가 또 String이면 한 번 더 디코드
+      if (decoded is String) {
+        decoded = jsonDecode(decoded);
+      }
+
+      // Map 체크 (Map<String, dynamic>이 아닌 Map<dynamic, dynamic>일 수 있음)
+      if (decoded is Map) {
+        final parsed = Map<String, dynamic>.from(decoded);
+        if (parsed.containsKey('feedback') ||
+            parsed.containsKey('summary') ||
+            parsed.containsKey('keypoint') ||
+            parsed.containsKey('cue')) {
           return parsed;
         }
       }
@@ -53,43 +68,6 @@ class FeedbackCard extends StatelessWidget {
 
     // 일반 텍스트 피드백 (fallback)
     return _buildPlainFeedback(isOnline);
-  }
-
-  bool _isEmptyFeedback(Map<String, dynamic> data) {
-    final feedback = data['feedback'] as String? ?? '';
-    final keypoint = data['keypoint'] as String? ?? '';
-    return feedback.isEmpty && keypoint.isEmpty;
-  }
-
-  Widget _buildNoIssueFeedback() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      decoration: BoxDecoration(
-        color: primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: primary.withValues(alpha: 0.25)),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.check_circle_outline, color: primary, size: 48),
-          const SizedBox(height: 12),
-          const Text(
-            '자세가 좋습니다!',
-            style: TextStyle(
-              color: textMain,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '현재 자세를 유지하면서 연습하세요.',
-            style: TextStyle(color: textSub, fontSize: 14),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildStructuredFeedback(Map<String, dynamic> data) {

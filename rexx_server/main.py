@@ -42,6 +42,30 @@ app.add_middleware(
 # DB 테이블 생성
 Base.metadata.create_all(bind=engine)
 
+
+# =========================
+# 자가 마이그레이션 (Alembic 없이)
+# =========================
+# SQLAlchemy.create_all()은 기존 테이블에 새 컬럼을 추가하지 않음.
+# Railway PG에 users.level 컬럼이 없는 경우 자동으로 추가.
+def _run_migrations():
+    from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS level VARCHAR(20) NOT NULL DEFAULT 'beginner'",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+                print(f"[Migration] OK: {sql}")
+            except Exception as e:
+                # SQLite는 ADD COLUMN IF NOT EXISTS 미지원 → 무시
+                print(f"[Migration] Skip ({type(e).__name__}): {sql}")
+
+
+_run_migrations()
+
 # =========================
 # Pydantic 스키마
 # =========================

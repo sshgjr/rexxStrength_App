@@ -21,8 +21,7 @@ class AuthService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        final detail = jsonDecode(response.body)['detail'] ?? '로그인 실패';
-        throw Exception(detail);
+        throw Exception(_extractErrorDetail(response.body, '로그인 실패'));
       }
     } on SocketException catch (e) {
       debugPrint('[AuthService] 네트워크 연결 오류: $e');
@@ -65,8 +64,7 @@ class AuthService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        final detail = jsonDecode(response.body)['detail'] ?? '회원가입 실패';
-        throw Exception(detail);
+        throw Exception(_extractErrorDetail(response.body, '회원가입 실패'));
       }
     } on SocketException catch (e) {
       debugPrint('[AuthService] 네트워크 연결 오류: $e');
@@ -75,5 +73,22 @@ class AuthService {
       debugPrint('[AuthService] 회원가입 오류: $e');
       rethrow;
     }
+  }
+
+  /// non-200 응답에서 오류 메시지 안전하게 추출.
+  /// JSON이 아닌 HTML/plain text 응답(예: 500 Internal Server Error)도 처리.
+  String _extractErrorDetail(String body, String fallback) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map && decoded['detail'] != null) {
+        return decoded['detail'].toString();
+      }
+    } catch (_) {
+      // JSON 아님 → 서버 내부 오류 가능성
+      if (body.trim().toLowerCase().contains('internal server error')) {
+        return '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+      }
+    }
+    return fallback;
   }
 }
