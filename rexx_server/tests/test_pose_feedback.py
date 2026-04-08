@@ -13,6 +13,10 @@ SAMPLE_FEEDBACK_REQUEST = {
         {"name": "좌우 대칭", "description": "좌우 대칭", "score": 70.0, "weight": 0.15, "grade": "warning"},
     ],
     "detected_issues": ["힙 힌지 각도: 주의 (72점)"],
+    "layer1_issues": [
+        {"criterion": "힙 힌지", "score": 72.0, "grade": "warning", "reason": "힙 힌지 각도 부족"}
+    ],
+    "layer2_issues": [],
 }
 
 

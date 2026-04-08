@@ -1,5 +1,6 @@
 import '../../../services/pose_feedback_service.dart';
 import 'exercise_phase.dart';
+import '../engine/layer_classifier.dart';
 
 /// 개별 평가 기준의 결과
 class CriterionResult {
@@ -59,6 +60,7 @@ class EvaluationResult {
   final DateTime evaluatedAt;
   final String? feedbackText; // LLM 피드백 (온라인 시)
   final FeedbackError? feedbackError; // 피드백 실패 원인
+  final LayerClassification? layerClassification; // 2-레이어 분류 결과
 
   const EvaluationResult({
     required this.exerciseType,
@@ -68,9 +70,14 @@ class EvaluationResult {
     required this.evaluatedAt,
     this.feedbackText,
     this.feedbackError,
+    this.layerClassification,
   });
 
-  EvaluationResult copyWith({String? feedbackText, FeedbackError? feedbackError}) {
+  EvaluationResult copyWith({
+    String? feedbackText,
+    FeedbackError? feedbackError,
+    LayerClassification? layerClassification,
+  }) {
     return EvaluationResult(
       exerciseType: exerciseType,
       totalScore: totalScore,
@@ -79,6 +86,7 @@ class EvaluationResult {
       evaluatedAt: evaluatedAt,
       feedbackText: feedbackText ?? this.feedbackText,
       feedbackError: feedbackError ?? this.feedbackError,
+      layerClassification: layerClassification ?? this.layerClassification,
     );
   }
 
@@ -94,10 +102,19 @@ class EvaluationResult {
         '인터넷 연결 시 더 자세한 피드백을 받을 수 있습니다.';
   }
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({String userLevel = 'beginner'}) => {
         'exercise_type': exerciseType.apiName,
         'total_score': totalScore,
         'criteria_scores': criteria.map((c) => c.toJson()).toList(),
         'detected_issues': detectedIssues,
+        'user_level': userLevel,
+        'layer1_issues': layerClassification?.layer1Issues
+                .map((i) => i.toJson())
+                .toList() ??
+            [],
+        'layer2_issues': layerClassification?.layer2Issues
+                .map((i) => i.toJson())
+                .toList() ??
+            [],
       };
 }

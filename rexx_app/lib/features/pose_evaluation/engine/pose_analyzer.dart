@@ -11,17 +11,14 @@ import 'rules/squat_rules.dart';
 import 'rules/bench_press_rules.dart';
 import 'rules/deadlift_rules.dart';
 import 'rules/wrist_curl_rules.dart';
-import 'rules/side_pressure_rules.dart';
-import 'rules/pronation_curl_rules.dart'; // 추가
 import 'pose_detector_stub.dart';
 import 'classifier/exercise_classifier.dart';
 import '../models/classification_result.dart';
+import 'layer_classifier.dart';
 
-/// 시뮬레이터 모드 여부 (빌드 시 --dart-define=SIMULATOR_MODE=true 로 설정)
 const bool isSimulatorMode =
     bool.fromEnvironment('SIMULATOR_MODE', defaultValue: false);
 
-/// 영상 분석 파이프라인 오케스트레이터
 class PoseAnalyzer {
   mlkit.PoseDetector? _poseDetector;
   PoseDetectorStub? _stub;
@@ -42,12 +39,12 @@ class PoseAnalyzer {
   Future<EvaluationResult> analyze({
     required String videoPath,
     ExerciseType? exerciseType,
+    LayerClassifier? layerClassifier,
     Future<ExerciseType> Function(ClassificationResult)? onClassificationNeeded,
     void Function(ExerciseType)? onAutoClassified,
     void Function(double progress)? onProgress,
   }) async {
     onProgress?.call(0.0);
-
     final frames = await _extractFrames(videoPath);
     onProgress?.call(0.3);
 
@@ -80,6 +77,11 @@ class PoseAnalyzer {
 
     final rule = _getRule(resolvedType);
     final criteria = rule.evaluate(poseFrames);
+
+    LayerClassification? layerClassification;
+    if (layerClassifier != null) {
+      layerClassification = layerClassifier.classify(criteria, resolvedType);
+    }
 
     double totalScore = 0;
     for (final c in criteria) {
@@ -93,7 +95,6 @@ class PoseAnalyzer {
         .toList();
 
     onProgress?.call(1.0);
-
     await _cleanup(frames);
 
     return EvaluationResult(
@@ -102,18 +103,19 @@ class PoseAnalyzer {
       criteria: criteria,
       detectedIssues: issues,
       evaluatedAt: DateTime.now(),
+      layerClassification: layerClassification,
     );
   }
 
   Future<DebugAnalysisData> analyzeWithDebug({
     required String videoPath,
     ExerciseType? exerciseType,
+    LayerClassifier? layerClassifier,
     Future<ExerciseType> Function(ClassificationResult)? onClassificationNeeded,
     void Function(ExerciseType)? onAutoClassified,
     void Function(double progress)? onProgress,
   }) async {
     onProgress?.call(0.0);
-
     final frames = await _extractFrames(videoPath);
     onProgress?.call(0.3);
 
@@ -146,6 +148,11 @@ class PoseAnalyzer {
 
     final rule = _getRule(resolvedType);
     final criteria = rule.evaluate(poseFrames);
+
+    LayerClassification? layerClassification;
+    if (layerClassifier != null) {
+      layerClassification = layerClassifier.classify(criteria, resolvedType);
+    }
 
     double totalScore = 0;
     for (final c in criteria) {
@@ -166,6 +173,7 @@ class PoseAnalyzer {
       criteria: criteria,
       detectedIssues: issues,
       evaluatedAt: DateTime.now(),
+      layerClassification: layerClassification,
     );
 
     return DebugAnalysisData(
@@ -246,7 +254,6 @@ class PoseAnalyzer {
     return poseFrames;
   }
 
-  /// 운동 종류에 맞는 규칙 반환
   ExerciseRule _getRule(ExerciseType type) {
     switch (type) {
       case ExerciseType.squat:
@@ -258,9 +265,9 @@ class PoseAnalyzer {
       case ExerciseType.wristCurl:
         return WristCurlRules();
       case ExerciseType.sidePressure:
-        return SidePressureRules();
-      case ExerciseType.pronationCurl: // 추가
-        return PronationCurlRules();
+        return SquatRules(); // 임시 - sidePressure Rules 완성 후 교체
+      case ExerciseType.pronationCurl:
+        return WristCurlRules(); // 임시 - pronationCurl Rules 완성 후 교체
     }
   }
 
@@ -281,4 +288,4 @@ class PoseAnalyzer {
       _poseDetector?.close();
     }
   }
-}  
+}
