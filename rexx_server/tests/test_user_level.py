@@ -33,3 +33,18 @@ def test_update_level_requires_auth(client):
     """비인증 요청은 401 반환."""
     res = client.put("/me/level", json={"level": "intermediate"})
     assert res.status_code == 401
+
+
+def test_put_level_sets_source_manual(client):
+    user = client.post("/register", json={
+        "username": "수동변경",
+        "email": "manual@example.com",
+        "password": "password123",
+    }).json()
+    headers = {"Authorization": f"Bearer {user['token']}"}
+
+    res = client.put("/me/level", headers=headers, json={"level": "advanced"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["level"] == "advanced"
+    assert body["level_source"] == "manual"

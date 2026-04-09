@@ -205,9 +205,10 @@ def update_level(
     db: Session = Depends(get_db),
 ):
     current_user.level = data.level.value
+    current_user.level_source = "manual"
     db.commit()
     db.refresh(current_user)
-    return {"success": True, "level": current_user.level}
+    return {"success": True, "level": current_user.level, "level_source": current_user.level_source}
 
 # =========================
 # 자세 평가 라우터
