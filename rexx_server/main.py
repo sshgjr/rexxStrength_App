@@ -66,6 +66,14 @@ def _run_migrations():
 
 _run_migrations()
 
+# 온보딩 컬럼 마이그레이션
+from migrations import ensure_onboarding_columns
+try:
+    ensure_onboarding_columns(engine)
+except Exception as e:
+    # 마이그레이션 실패해도 부팅은 계속 (기존 컬럼만으로도 동작)
+    print(f"[startup] 마이그레이션 중 오류 (무시): {e}")
+
 # =========================
 # Pydantic 스키마
 # =========================
