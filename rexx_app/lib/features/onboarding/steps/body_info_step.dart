@@ -18,11 +18,22 @@ class BodyInfoStep extends StatefulWidget {
 
 class _BodyInfoStepState extends State<BodyInfoStep> {
   final _yearCtrl = TextEditingController();
+  bool _showError = false;
 
   @override
   void dispose() {
     _yearCtrl.dispose();
     super.dispose();
+  }
+
+  bool get _isValid => widget.input.sex != null;
+
+  void _handleNext() {
+    if (_isValid) {
+      widget.onNext();
+    } else {
+      setState(() => _showError = true);
+    }
   }
 
   @override
@@ -36,12 +47,25 @@ class _BodyInfoStepState extends State<BodyInfoStep> {
           const Text('신체 정보',
               style: TextStyle(color: Color(0xFFE9F5EF), fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
-          const Text('성별', style: TextStyle(color: Color(0xFFA7B9B0), fontSize: 14)),
+          Row(
+            children: [
+              const Text('성별', style: TextStyle(color: Color(0xFFA7B9B0), fontSize: 14)),
+              const Text(' *', style: TextStyle(color: Color(0xFF16A34A), fontSize: 14)),
+            ],
+          ),
           const SizedBox(height: 8),
           _SexRadio(
             value: widget.input.sex,
-            onChanged: (v) => setState(() => widget.input.sex = v),
+            onChanged: (v) => setState(() {
+              widget.input.sex = v;
+              if (v != null) _showError = false;
+            }),
           ),
+          if (_showError && widget.input.sex == null) ...[
+            const SizedBox(height: 6),
+            const Text('성별을 선택해주세요',
+                style: TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+          ],
           const SizedBox(height: 24),
           const Text('출생연도 (선택)', style: TextStyle(color: Color(0xFFA7B9B0), fontSize: 14)),
           const SizedBox(height: 8),
@@ -72,10 +96,12 @@ class _BodyInfoStepState extends State<BodyInfoStep> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: widget.onNext,
+                  onPressed: _handleNext,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF16A34A),
+                    backgroundColor: _isValid ? const Color(0xFF16A34A) : const Color(0xFF1F2925),
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF1F2925),
+                    disabledForegroundColor: const Color(0xFF4A5651),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: const Text('다음'),
@@ -100,9 +126,9 @@ class _SexRadio extends StatelessWidget {
     return Wrap(
       spacing: 8,
       children: [
-        for (final option in [...OnboardingSex.values, null])
+        for (final option in OnboardingSex.values)
           ChoiceChip(
-            label: Text(option?.label ?? '선택안함'),
+            label: Text(option.label),
             selected: value == option,
             onSelected: (_) => onChanged(option),
             selectedColor: const Color(0xFF16A34A),

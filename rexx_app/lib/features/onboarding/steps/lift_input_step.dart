@@ -20,6 +20,21 @@ class _LiftInputStepState extends State<LiftInputStep> {
   final _squatCtrl = TextEditingController();
   final _benchCtrl = TextEditingController();
   final _deadCtrl = TextEditingController();
+  bool _showErrors = false;
+
+  bool _liftOk(double? value, bool unknown) =>
+      unknown || (value != null && value > 0);
+
+  void _handleComplete() {
+    final i = widget.input;
+    if (_liftOk(i.squat1rm, i.squatUnknown) &&
+        _liftOk(i.bench1rm, i.benchUnknown) &&
+        _liftOk(i.deadlift1rm, i.deadliftUnknown)) {
+      widget.onComplete();
+    } else {
+      setState(() => _showErrors = true);
+    }
+  }
 
   @override
   void dispose() {
@@ -48,6 +63,7 @@ class _LiftInputStepState extends State<LiftInputStep> {
               label: '스쿼트',
               controller: _squatCtrl,
               unknown: widget.input.squatUnknown,
+              showError: _showErrors && !_liftOk(widget.input.squat1rm, widget.input.squatUnknown),
               onValueChanged: (v) { widget.input.squat1rm = v; setState(() {}); },
               onUnknownChanged: (v) => setState(() => widget.input.squatUnknown = v),
             ),
@@ -56,6 +72,7 @@ class _LiftInputStepState extends State<LiftInputStep> {
               label: '벤치프레스',
               controller: _benchCtrl,
               unknown: widget.input.benchUnknown,
+              showError: _showErrors && !_liftOk(widget.input.bench1rm, widget.input.benchUnknown),
               onValueChanged: (v) { widget.input.bench1rm = v; setState(() {}); },
               onUnknownChanged: (v) => setState(() => widget.input.benchUnknown = v),
             ),
@@ -64,24 +81,24 @@ class _LiftInputStepState extends State<LiftInputStep> {
               label: '데드리프트',
               controller: _deadCtrl,
               unknown: widget.input.deadliftUnknown,
+              showError: _showErrors && !_liftOk(widget.input.deadlift1rm, widget.input.deadliftUnknown),
               onValueChanged: (v) { widget.input.deadlift1rm = v; setState(() {}); },
               onUnknownChanged: (v) => setState(() => widget.input.deadliftUnknown = v),
             ),
             const SizedBox(height: 32),
             Builder(builder: (_) {
               final i = widget.input;
-              final squatOk = i.squatUnknown || (i.squat1rm != null && i.squat1rm! > 0);
-              final benchOk = i.benchUnknown || (i.bench1rm != null && i.bench1rm! > 0);
-              final deadOk = i.deadliftUnknown || (i.deadlift1rm != null && i.deadlift1rm! > 0);
-              final allFilled = squatOk && benchOk && deadOk;
-              final enabled = allFilled && !widget.submitting;
+              final allFilled = _liftOk(i.squat1rm, i.squatUnknown) &&
+                  _liftOk(i.bench1rm, i.benchUnknown) &&
+                  _liftOk(i.deadlift1rm, i.deadliftUnknown);
+              final visualEnabled = allFilled && !widget.submitting;
 
               return SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: enabled ? widget.onComplete : null,
+                  onPressed: widget.submitting ? null : _handleComplete,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: enabled ? const Color(0xFF16A34A) : const Color(0xFF1F2925),
+                    backgroundColor: visualEnabled ? const Color(0xFF16A34A) : const Color(0xFF1F2925),
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: const Color(0xFF1F2925),
                     disabledForegroundColor: const Color(0xFF4A5651),
@@ -108,6 +125,7 @@ class _LiftField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final bool unknown;
+  final bool showError;
   final ValueChanged<double?> onValueChanged;
   final ValueChanged<bool> onUnknownChanged;
 
@@ -115,6 +133,7 @@ class _LiftField extends StatelessWidget {
     required this.label,
     required this.controller,
     required this.unknown,
+    this.showError = false,
     required this.onValueChanged,
     required this.onUnknownChanged,
   });
@@ -124,7 +143,12 @@ class _LiftField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFFA7B9B0), fontSize: 14)),
+        Row(
+          children: [
+            Text(label, style: const TextStyle(color: Color(0xFFA7B9B0), fontSize: 14)),
+            const Text(' *', style: TextStyle(color: Color(0xFF16A34A), fontSize: 14)),
+          ],
+        ),
         const SizedBox(height: 6),
         Row(
           children: [
@@ -157,6 +181,11 @@ class _LiftField extends StatelessWidget {
             ),
           ],
         ),
+        if (showError) ...[
+          const SizedBox(height: 4),
+          Text('$label 중량을 입력하거나 모름을 선택해주세요',
+              style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+        ],
       ],
     );
   }
