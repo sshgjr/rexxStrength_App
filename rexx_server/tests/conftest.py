@@ -1,3 +1,11 @@
+import os
+
+# main.py는 import 시점에 create_all()을 호출하며, .env의 DATABASE_URL이
+# Railway postgres를 가리키므로 로컬/CI 환경에서 테스트가 import 단계에서
+# 실패한다. main import 전에 강제로 인메모리 SQLite로 덮어써 독립적인
+# 테스트 환경을 보장한다.
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
