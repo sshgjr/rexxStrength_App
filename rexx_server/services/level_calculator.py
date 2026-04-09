@@ -52,3 +52,97 @@ def score_single_lift(
             score += 1
     # score는 0~5 범위 → 0~4로 clamp (Elite 이상은 4)
     return min(score, 4)
+
+
+@dataclass
+class LevelCalculation:
+    level: Literal["beginner", "intermediate", "advanced"]
+    avg_tier_score: float
+    capped_by_experience: bool
+    per_lift: dict[str, int]
+
+
+@dataclass
+class LevelCalculationFailure:
+    missing_reasons: list[str] = field(default_factory=list)
+
+
+_EXPERIENCE_CAPS = {
+    "lt_6m": "beginner",
+    "6m_2y": "intermediate",
+    "2_5y": None,
+    "5y_plus": None,
+}
+
+_LEVEL_ORDER = ["beginner", "intermediate", "advanced"]
+
+
+def _avg_to_level(avg: float) -> str:
+    if avg < 2.0:
+        return "beginner"
+    if avg < 3.5:
+        return "intermediate"
+    return "advanced"
+
+
+def _apply_experience_cap(level: str, experience: str | None) -> tuple[str, bool]:
+    if experience is None:
+        return level, False
+    cap = _EXPERIENCE_CAPS.get(experience)
+    if cap is None:
+        return level, False
+    if _LEVEL_ORDER.index(level) > _LEVEL_ORDER.index(cap):
+        return cap, True
+    return level, False
+
+
+def calculate(
+    sex: str | None,
+    body_weight_kg: float | None,
+    squat_1rm: float | None,
+    bench_1rm: float | None,
+    deadlift_1rm: float | None,
+    training_experience: str | None,
+) -> Union[LevelCalculation, LevelCalculationFailure]:
+    """등급 산정 진입점.
+
+    입력이 부족하면 LevelCalculationFailure를 반환하여
+    호출자가 default beginner로 처리하도록 함.
+    """
+    reasons: list[str] = []
+
+    lifts = {
+        "squat": squat_1rm,
+        "bench": bench_1rm,
+        "deadlift": deadlift_1rm,
+    }
+    provided = {k: v for k, v in lifts.items() if v is not None and v > 0}
+
+    if not provided:
+        reasons.append("no_lift_inputs")
+    if body_weight_kg is None or body_weight_kg <= 0:
+        reasons.append("missing_body_weight")
+
+    if reasons:
+        return LevelCalculationFailure(missing_reasons=reasons)
+
+    effective_sex = sex if sex in ("male", "female") else "male"
+
+    try:
+        per_lift = {
+            lift: score_single_lift(effective_sex, body_weight_kg, lift, one_rm)
+            for lift, one_rm in provided.items()
+        }
+    except Exception:
+        return LevelCalculationFailure(missing_reasons=["internal_error"])
+
+    avg = sum(per_lift.values()) / len(per_lift)
+    raw_level = _avg_to_level(avg)
+    final_level, capped = _apply_experience_cap(raw_level, training_experience)
+
+    return LevelCalculation(
+        level=final_level,
+        avg_tier_score=round(avg, 2),
+        capped_by_experience=capped,
+        per_lift=per_lift,
+    )

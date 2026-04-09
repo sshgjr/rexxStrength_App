@@ -1,5 +1,10 @@
 """level_calculator 유닛 테스트."""
 from services.level_calculator import score_single_lift
+from services.level_calculator import (
+    calculate,
+    LevelCalculation,
+    LevelCalculationFailure,
+)
 
 
 def test_score_below_beginner_returns_0():
@@ -48,3 +53,124 @@ def test_weight_above_max_clamps_to_largest_bucket():
     # 200kg (120kg 초과) → 120kg 표준 사용
     # 120kg 남성 스쿼트 Beginner=85
     assert score_single_lift("male", 200.0, "squat", 85.0) == 1
+
+
+def test_calculate_intermediate_user():
+    """70kg 남성 / 스쿼트 120 (I), 벤치 90 (I), 데드 140 (I) → 평균 ≈ 3 → 중급."""
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=120.0,
+        bench_1rm=90.0,
+        deadlift_1rm=140.0,
+        training_experience="2_5y",
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.level == "intermediate"
+    assert result.capped_by_experience is False
+    assert result.per_lift == {"squat": 3, "bench": 3, "deadlift": 3}
+
+
+def test_calculate_advanced_user():
+    """avg ≥ 3.5 → 상급."""
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=215.0,  # E = 4
+        bench_1rm=165.0,  # E = 4
+        deadlift_1rm=245.0,  # E = 4
+        training_experience="5y_plus",
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.level == "advanced"
+
+
+def test_calculate_beginner_user():
+    """avg < 2.0 → 초급."""
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=50.0,  # B (1)
+        bench_1rm=45.0,  # B (1)
+        deadlift_1rm=70.0,  # B (1)
+        training_experience="6m_2y",
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.level == "beginner"
+
+
+def test_partial_input_only_squat():
+    """스쿼트만 입력 → 그 한 종목 평균으로 산정."""
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=120.0,
+        bench_1rm=None,
+        deadlift_1rm=None,
+        training_experience=None,
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.per_lift == {"squat": 3}
+
+
+def test_no_lifts_returns_failure():
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=None,
+        bench_1rm=None,
+        deadlift_1rm=None,
+        training_experience=None,
+    )
+    assert isinstance(result, LevelCalculationFailure)
+    assert "no_lift_inputs" in result.missing_reasons
+
+
+def test_no_body_weight_returns_failure():
+    result = calculate(
+        sex="male",
+        body_weight_kg=None,
+        squat_1rm=120.0,
+        bench_1rm=None,
+        deadlift_1rm=None,
+        training_experience=None,
+    )
+    assert isinstance(result, LevelCalculationFailure)
+    assert "missing_body_weight" in result.missing_reasons
+
+
+def test_no_weight_and_no_lifts_returns_both_reasons():
+    result = calculate(
+        sex="male",
+        body_weight_kg=None,
+        squat_1rm=None,
+        bench_1rm=None,
+        deadlift_1rm=None,
+        training_experience=None,
+    )
+    assert isinstance(result, LevelCalculationFailure)
+    assert "missing_body_weight" in result.missing_reasons
+    assert "no_lift_inputs" in result.missing_reasons
+
+
+def test_sex_none_uses_male_standard():
+    """성별 미입력 시 male 표준 fallback."""
+    result_none = calculate(
+        sex=None,
+        body_weight_kg=70.0,
+        squat_1rm=120.0,
+        bench_1rm=None,
+        deadlift_1rm=None,
+        training_experience=None,
+    )
+    result_male = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=120.0,
+        bench_1rm=None,
+        deadlift_1rm=None,
+        training_experience=None,
+    )
+    assert isinstance(result_none, LevelCalculation)
+    assert isinstance(result_male, LevelCalculation)
+    assert result_none.per_lift == result_male.per_lift
