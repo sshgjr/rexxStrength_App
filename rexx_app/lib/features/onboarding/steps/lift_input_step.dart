@@ -48,7 +48,7 @@ class _LiftInputStepState extends State<LiftInputStep> {
               label: '스쿼트',
               controller: _squatCtrl,
               unknown: widget.input.squatUnknown,
-              onValueChanged: (v) => widget.input.squat1rm = v,
+              onValueChanged: (v) { widget.input.squat1rm = v; setState(() {}); },
               onUnknownChanged: (v) => setState(() => widget.input.squatUnknown = v),
             ),
             const SizedBox(height: 16),
@@ -56,7 +56,7 @@ class _LiftInputStepState extends State<LiftInputStep> {
               label: '벤치프레스',
               controller: _benchCtrl,
               unknown: widget.input.benchUnknown,
-              onValueChanged: (v) => widget.input.bench1rm = v,
+              onValueChanged: (v) { widget.input.bench1rm = v; setState(() {}); },
               onUnknownChanged: (v) => setState(() => widget.input.benchUnknown = v),
             ),
             const SizedBox(height: 16),
@@ -64,26 +64,38 @@ class _LiftInputStepState extends State<LiftInputStep> {
               label: '데드리프트',
               controller: _deadCtrl,
               unknown: widget.input.deadliftUnknown,
-              onValueChanged: (v) => widget.input.deadlift1rm = v,
+              onValueChanged: (v) { widget.input.deadlift1rm = v; setState(() {}); },
               onUnknownChanged: (v) => setState(() => widget.input.deadliftUnknown = v),
             ),
             const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: widget.submitting ? null : widget.onComplete,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+            Builder(builder: (_) {
+              final i = widget.input;
+              final squatOk = i.squatUnknown || (i.squat1rm != null && i.squat1rm! > 0);
+              final benchOk = i.benchUnknown || (i.bench1rm != null && i.bench1rm! > 0);
+              final deadOk = i.deadliftUnknown || (i.deadlift1rm != null && i.deadlift1rm! > 0);
+              final allFilled = squatOk && benchOk && deadOk;
+              final enabled = allFilled && !widget.submitting;
+
+              return SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: enabled ? widget.onComplete : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: enabled ? const Color(0xFF16A34A) : const Color(0xFF1F2925),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF1F2925),
+                    disabledForegroundColor: const Color(0xFF4A5651),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: widget.submitting
+                      ? const SizedBox(
+                          height: 20, width: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('완료', style: TextStyle(fontSize: 16)),
                 ),
-                child: widget.submitting
-                    ? const SizedBox(
-                        height: 20, width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Text('완료', style: TextStyle(fontSize: 16)),
-              ),
-            ),
+              );
+            }),
             const SizedBox(height: 16),
           ],
         ),

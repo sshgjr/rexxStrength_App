@@ -60,6 +60,7 @@ class ResultStep extends StatelessWidget {
               onPressed: onConfirm,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: const Text('확인', style: TextStyle(fontSize: 16)),

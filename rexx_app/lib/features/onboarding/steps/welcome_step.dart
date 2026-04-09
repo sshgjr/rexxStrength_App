@@ -33,6 +33,7 @@ class WelcomeStep extends StatelessWidget {
               onPressed: onStart,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: const Text('시작하기', style: TextStyle(fontSize: 16)),

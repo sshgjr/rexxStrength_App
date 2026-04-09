@@ -52,6 +52,7 @@ class _ExperienceStepState extends State<ExperienceStep> {
                   onPressed: widget.onNext,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: const Text('다음'),
