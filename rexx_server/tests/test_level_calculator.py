@@ -174,3 +174,106 @@ def test_sex_none_uses_male_standard():
     assert isinstance(result_none, LevelCalculation)
     assert isinstance(result_male, LevelCalculation)
     assert result_none.per_lift == result_male.per_lift
+
+
+def test_experience_cap_lt_6m_forces_beginner():
+    """경력 6개월 미만이면 1RM이 높아도 초급으로 강제."""
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=215.0,
+        bench_1rm=165.0,
+        deadlift_1rm=245.0,
+        training_experience="lt_6m",
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.level == "beginner"
+    assert result.capped_by_experience is True
+
+
+def test_experience_cap_6m_2y_forces_intermediate():
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=215.0,
+        bench_1rm=165.0,
+        deadlift_1rm=245.0,
+        training_experience="6m_2y",
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.level == "intermediate"
+    assert result.capped_by_experience is True
+
+
+def test_experience_5y_plus_no_cap():
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=120.0,
+        bench_1rm=90.0,
+        deadlift_1rm=140.0,
+        training_experience="5y_plus",
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.capped_by_experience is False
+
+
+def test_experience_cap_does_not_upgrade():
+    """경력 5y_plus라도 1RM이 낮으면 초급은 초급."""
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=50.0,
+        bench_1rm=45.0,
+        deadlift_1rm=70.0,
+        training_experience="5y_plus",
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.level == "beginner"
+    assert result.capped_by_experience is False
+
+
+def test_cutoff_boundary_just_below_intermediate():
+    """avg=1.67 → 초급."""
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=50.0,   # B(45) ≤ 50 < N(80) → 1
+        bench_1rm=60.0,   # B(40) ≤ 60 < N(60)? 60=N → 2
+        deadlift_1rm=95.0,  # B(60) ≤ 95 < N(95)? 95=N → 2
+        training_experience=None,
+    )
+    assert isinstance(result, LevelCalculation)
+    avg = result.avg_tier_score
+    assert avg < 2.0
+    assert result.level == "beginner"
+
+
+def test_cutoff_boundary_just_below_advanced():
+    """avg < 3.5 → 중급."""
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=120.0,  # I(120) → 3
+        bench_1rm=90.0,   # I(90) → 3
+        deadlift_1rm=140.0,  # I(140) → 3
+        training_experience=None,
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.avg_tier_score < 3.5
+    assert result.level == "intermediate"
+
+
+def test_cutoff_boundary_at_advanced():
+    """avg ≥ 3.5 → 상급."""
+    result = calculate(
+        sex="male",
+        body_weight_kg=70.0,
+        squat_1rm=120.0,     # I(120) → 3
+        bench_1rm=125.0,     # A(125) → 4
+        deadlift_1rm=190.0,  # A(190) → 4
+        training_experience=None,
+    )
+    assert isinstance(result, LevelCalculation)
+    assert result.avg_tier_score >= 3.5
+    assert result.level == "advanced"
