@@ -216,3 +216,9 @@ from routers.pose_feedback import router as pose_router, limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(pose_router)
+
+# =========================
+# 온보딩 라우터
+# =========================
+from routers.onboarding import router as onboarding_router
+app.include_router(onboarding_router)
