@@ -8,6 +8,8 @@ import 'one_rm_page.dart';
 import '../features/pose_evaluation/screens/exercise_select_screen.dart';
 import '../features/pose_evaluation/engine/layer_classifier.dart';
 import '../services/level_service.dart';
+import '../services/auth_service.dart';
+import '../features/onboarding/onboarding_flow.dart';
 
 class RexxHomeScreen extends StatefulWidget {
   const RexxHomeScreen({super.key});
@@ -418,6 +420,19 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
 
   // 게스트가 회원가입 후 돌아온 경우 로그인 상태 업데이트
 
+  Future<void> _maybeStartOnboarding() async {
+    if (token == null || !mounted) return;
+    final needs = await AuthService().getOnboardingStatus(token!);
+    if (!needs || !mounted) return;
+
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => OnboardingFlow(
+        token: token!,
+        onComplete: () => Navigator.of(context).pop(),
+      ),
+    ));
+  }
+
   /// 등급 선택 바텀시트 표시
   Future<void> _showLevelSettingsSheet() async {
     final levelService = LevelService();
@@ -481,6 +496,10 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
 
       if (!mounted) return;
 
+      // 온보딩 필요 시 먼저 온보딩 진행
+      await _maybeStartOnboarding();
+
+      if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
