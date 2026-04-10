@@ -26,7 +26,9 @@ class _BodyInfoStepState extends State<BodyInfoStep> {
     super.dispose();
   }
 
-  bool get _isValid => widget.input.sex != null;
+  bool _sexSelected = false;
+
+  bool get _isValid => _sexSelected;
 
   void _handleNext() {
     if (_isValid) {
@@ -56,14 +58,16 @@ class _BodyInfoStepState extends State<BodyInfoStep> {
           const SizedBox(height: 8),
           _SexRadio(
             value: widget.input.sex,
-            onChanged: (v) => setState(() {
+            sexSelected: _sexSelected,
+            onChanged: (v, selected) => setState(() {
               widget.input.sex = v;
-              if (v != null) _showError = false;
+              _sexSelected = selected;
+              _showError = false;
             }),
           ),
-          if (_showError && widget.input.sex == null) ...[
+          if (_showError && !_sexSelected) ...[
             const SizedBox(height: 6),
-            const Text('성별을 선택해주세요',
+            const Text('성별을 선택하거나 입력안함을 눌러주세요',
                 style: TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
           ],
           const SizedBox(height: 24),
@@ -118,23 +122,26 @@ class _BodyInfoStepState extends State<BodyInfoStep> {
 
 class _SexRadio extends StatelessWidget {
   final OnboardingSex? value;
-  final ValueChanged<OnboardingSex?> onChanged;
-  const _SexRadio({required this.value, required this.onChanged});
+  final bool sexSelected;
+  final void Function(OnboardingSex?, bool selected) onChanged;
+  const _SexRadio({required this.value, required this.sexSelected, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
+    // null = "입력안함" 옵션
+    final options = [...OnboardingSex.values, null];
     return Wrap(
       spacing: 8,
       children: [
-        for (final option in OnboardingSex.values)
+        for (final option in options)
           ChoiceChip(
-            label: Text(option.label),
-            selected: value == option,
-            onSelected: (_) => onChanged(option),
+            label: Text(option?.label ?? '입력안함'),
+            selected: sexSelected && value == option,
+            onSelected: (_) => onChanged(option, true),
             selectedColor: const Color(0xFF16A34A),
             backgroundColor: const Color(0xFF0F1612),
             labelStyle: TextStyle(
-              color: value == option ? Colors.white : const Color(0xFFA7B9B0),
+              color: (sexSelected && value == option) ? Colors.white : const Color(0xFFA7B9B0),
             ),
           ),
       ],
