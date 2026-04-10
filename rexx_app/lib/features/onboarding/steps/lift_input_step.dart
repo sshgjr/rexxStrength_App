@@ -1,0 +1,192 @@
+import 'package:flutter/material.dart';
+import '../models/onboarding_state.dart';
+
+class LiftInputStep extends StatefulWidget {
+  final OnboardingInput input;
+  final bool submitting;
+  final VoidCallback onComplete;
+  const LiftInputStep({
+    super.key,
+    required this.input,
+    required this.submitting,
+    required this.onComplete,
+  });
+
+  @override
+  State<LiftInputStep> createState() => _LiftInputStepState();
+}
+
+class _LiftInputStepState extends State<LiftInputStep> {
+  final _squatCtrl = TextEditingController();
+  final _benchCtrl = TextEditingController();
+  final _deadCtrl = TextEditingController();
+  bool _showErrors = false;
+
+  bool _liftOk(double? value, bool unknown) =>
+      unknown || (value != null && value > 0);
+
+  void _handleComplete() {
+    final i = widget.input;
+    if (_liftOk(i.squat1rm, i.squatUnknown) &&
+        _liftOk(i.bench1rm, i.benchUnknown) &&
+        _liftOk(i.deadlift1rm, i.deadliftUnknown)) {
+      widget.onComplete();
+    } else {
+      setState(() => _showErrors = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _squatCtrl.dispose();
+    _benchCtrl.dispose();
+    _deadCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 40),
+            const Text('3대 중량',
+                style: TextStyle(color: Color(0xFFE9F5EF), fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('현재 기준 1RM(1회 최대 중량)을 입력해주세요. 모르면 체크박스를 누르세요.',
+                style: TextStyle(color: Color(0xFFA7B9B0), fontSize: 14)),
+            const SizedBox(height: 24),
+            _LiftField(
+              label: '스쿼트',
+              controller: _squatCtrl,
+              unknown: widget.input.squatUnknown,
+              showError: _showErrors && !_liftOk(widget.input.squat1rm, widget.input.squatUnknown),
+              onValueChanged: (v) { widget.input.squat1rm = v; setState(() {}); },
+              onUnknownChanged: (v) => setState(() => widget.input.squatUnknown = v),
+            ),
+            const SizedBox(height: 16),
+            _LiftField(
+              label: '벤치프레스',
+              controller: _benchCtrl,
+              unknown: widget.input.benchUnknown,
+              showError: _showErrors && !_liftOk(widget.input.bench1rm, widget.input.benchUnknown),
+              onValueChanged: (v) { widget.input.bench1rm = v; setState(() {}); },
+              onUnknownChanged: (v) => setState(() => widget.input.benchUnknown = v),
+            ),
+            const SizedBox(height: 16),
+            _LiftField(
+              label: '데드리프트',
+              controller: _deadCtrl,
+              unknown: widget.input.deadliftUnknown,
+              showError: _showErrors && !_liftOk(widget.input.deadlift1rm, widget.input.deadliftUnknown),
+              onValueChanged: (v) { widget.input.deadlift1rm = v; setState(() {}); },
+              onUnknownChanged: (v) => setState(() => widget.input.deadliftUnknown = v),
+            ),
+            const SizedBox(height: 32),
+            Builder(builder: (_) {
+              final i = widget.input;
+              final allFilled = _liftOk(i.squat1rm, i.squatUnknown) &&
+                  _liftOk(i.bench1rm, i.benchUnknown) &&
+                  _liftOk(i.deadlift1rm, i.deadliftUnknown);
+              final visualEnabled = allFilled && !widget.submitting;
+
+              return SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: widget.submitting ? null : _handleComplete,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: visualEnabled ? const Color(0xFF16A34A) : const Color(0xFF1F2925),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF1F2925),
+                    disabledForegroundColor: const Color(0xFF4A5651),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: widget.submitting
+                      ? const SizedBox(
+                          height: 20, width: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('완료', style: TextStyle(fontSize: 16)),
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiftField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final bool unknown;
+  final bool showError;
+  final ValueChanged<double?> onValueChanged;
+  final ValueChanged<bool> onUnknownChanged;
+
+  const _LiftField({
+    required this.label,
+    required this.controller,
+    required this.unknown,
+    this.showError = false,
+    required this.onValueChanged,
+    required this.onUnknownChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(label, style: const TextStyle(color: Color(0xFFA7B9B0), fontSize: 14)),
+            const Text(' *', style: TextStyle(color: Color(0xFF16A34A), fontSize: 14)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                enabled: !unknown,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Color(0xFFE9F5EF)),
+                decoration: InputDecoration(
+                  hintText: 'kg',
+                  hintStyle: const TextStyle(color: Color(0xFF4A5651)),
+                  filled: true,
+                  fillColor: unknown ? const Color(0xFF1A1F1C) : const Color(0xFF0F1612),
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (v) => onValueChanged(double.tryParse(v)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Row(
+              children: [
+                Checkbox(
+                  value: unknown,
+                  onChanged: (v) => onUnknownChanged(v ?? false),
+                  activeColor: const Color(0xFF16A34A),
+                ),
+                const Text('모름', style: TextStyle(color: Color(0xFFA7B9B0))),
+              ],
+            ),
+          ],
+        ),
+        if (showError) ...[
+          const SizedBox(height: 4),
+          Text('$label 중량을 입력하거나 모름을 선택해주세요',
+              style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+        ],
+      ],
+    );
+  }
+}

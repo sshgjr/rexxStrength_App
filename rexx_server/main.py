@@ -66,6 +66,14 @@ def _run_migrations():
 
 _run_migrations()
 
+# 온보딩 컬럼 마이그레이션
+from migrations import ensure_onboarding_columns
+try:
+    ensure_onboarding_columns(engine)
+except Exception as e:
+    # 마이그레이션 실패해도 부팅은 계속 (기존 컬럼만으로도 동작)
+    print(f"[startup] 마이그레이션 중 오류 (무시): {e}")
+
 # =========================
 # Pydantic 스키마
 # =========================
@@ -197,9 +205,10 @@ def update_level(
     db: Session = Depends(get_db),
 ):
     current_user.level = data.level.value
+    current_user.level_source = "manual"
     db.commit()
     db.refresh(current_user)
-    return {"success": True, "level": current_user.level}
+    return {"success": True, "level": current_user.level, "level_source": current_user.level_source}
 
 # =========================
 # 자세 평가 라우터
@@ -208,3 +217,9 @@ from routers.pose_feedback import router as pose_router, limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(pose_router)
+
+# =========================
+# 온보딩 라우터
+# =========================
+from routers.onboarding import router as onboarding_router
+app.include_router(onboarding_router)

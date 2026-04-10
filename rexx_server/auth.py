@@ -38,6 +38,14 @@ class User(Base):
     is_body_public = Column(Boolean, default=False, nullable=False)
     interests = Column(Text, nullable=True)  # JSON array string
     level = Column(String(20), nullable=False, server_default="beginner")  # beginner, intermediate, advanced
+    # === 코칭 등급 온보딩 (2026-04-09 추가) ===
+    sex = Column(String(10), nullable=True)  # "male" | "female" | None
+    birth_year = Column(Integer, nullable=True)
+    training_experience = Column(String(20), nullable=True)  # lt_6m | 6m_2y | 2_5y | 5y_plus
+    squat_1rm = Column(Float, nullable=True)
+    bench_1rm = Column(Float, nullable=True)
+    deadlift_1rm = Column(Float, nullable=True)
+    level_source = Column(String(20), nullable=True)  # auto | manual | default | None(미온보딩)
 
 
 # =========================

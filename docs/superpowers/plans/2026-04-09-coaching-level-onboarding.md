@@ -211,12 +211,13 @@ def test_score_below_beginner_returns_0():
 
 
 def test_score_at_beginner_returns_1():
-    # 정확히 Beginner 컷오프 → 1 (B 이상이지만 N 미만)
+    # 정확히 Beginner 컷오프 → 1 (B tier 진입)
     assert score_single_lift("male", 70.0, "squat", 45.0) == 1
 
 
-def test_score_at_intermediate_returns_2():
-    assert score_single_lift("male", 70.0, "squat", 120.0) == 2
+def test_score_at_intermediate_returns_3():
+    # 정확히 Intermediate 컷오프 → 3 (I tier 진입, Task 5 경계 테스트와 정합)
+    assert score_single_lift("male", 70.0, "squat", 120.0) == 3
 
 
 def test_score_at_elite_returns_4():
