@@ -1,10 +1,12 @@
-import '../models/pose_frame.dart';
 import 'dart:math';
+import '../models/pose_frame.dart';
+import 'pose_detector_interface.dart';
 
 /// 시뮬레이터용 ML Kit 대체 스텁
 /// 실제 포즈 감지 대신 샘플 데이터를 반환합니다.
-class PoseDetectorStub {
+class PoseDetectorStub implements PoseDetectorInterface {
   /// 프레임 경로 목록에서 mock 포즈 데이터 생성
+  @override
   Future<List<PoseFrame>> detectPoses(List<String> framePaths) async {
     final poseFrames = <PoseFrame>[];
     final random = Random(42); // 일관된 결과를 위한 고정 시드
@@ -94,5 +96,6 @@ class PoseDetectorStub {
     }
   }
 
+  @override
   void close() {}
 }
