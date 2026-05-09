@@ -404,7 +404,11 @@ class _SignupPromptSheetState extends State<SignupPromptSheet> {
       ),
       child: const Row(
         children: [
-          Text('💪', style: TextStyle(fontSize: 28)),
+          Icon(
+            Icons.sports_gymnastics,
+            size: 28,
+            color: Color(0xFFF97316),
+          ),
           SizedBox(width: 12),
           Expanded(
             child: Text(

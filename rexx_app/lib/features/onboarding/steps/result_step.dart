@@ -29,13 +29,24 @@ class ResultStep extends StatelessWidget {
             style: const TextStyle(color: Color(0xFFA7B9B0), fontSize: 16),
           ),
           const SizedBox(height: 16),
-          Text(
-            '${result.levelEmoji} ${result.levelKorean}${_isDefault ? '으로' : ''}',
-            style: const TextStyle(
-              color: Color(0xFFE9F5EF),
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                result.levelIcon,
+                size: 36,
+                color: result.levelIconColor,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${result.levelKorean}${_isDefault ? '으로' : ''}',
+                style: const TextStyle(
+                  color: Color(0xFFE9F5EF),
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
           if (_isDefault) ...[
             const SizedBox(height: 8),

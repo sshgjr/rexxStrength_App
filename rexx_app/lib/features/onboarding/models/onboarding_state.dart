@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 // 온보딩 입력 상태 + 응답 모델.
 
 enum OnboardingExperience {
@@ -81,10 +83,17 @@ class OnboardingResult {
         _ => level,
       };
 
-  String get levelEmoji => switch (level) {
-        'beginner' => '🥉',
-        'intermediate' => '🥈',
-        'advanced' => '🥇',
-        _ => '',
+  IconData get levelIcon => switch (level) {
+        'beginner' => Icons.workspace_premium,
+        'intermediate' => Icons.military_tech,
+        'advanced' => Icons.emoji_events,
+        _ => Icons.fitness_center,
+      };
+
+  Color get levelIconColor => switch (level) {
+        'beginner' => const Color(0xFFCD7F32),
+        'intermediate' => const Color(0xFFC0C0C0),
+        'advanced' => const Color(0xFFFFD700),
+        _ => const Color(0xFFA7B9B0),
       };
 }
