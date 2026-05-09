@@ -41,6 +41,8 @@ class PoseHistoryItem(BaseModel):
     total_score: int
     feedback_text: Optional[str]
     created_at: datetime
+    criteria_scores: List[CriterionScore] = []
+    detected_issues: List[str] = []
 
 
 class PoseHistoryResponse(BaseModel):

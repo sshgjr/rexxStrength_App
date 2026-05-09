@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../features/pose_evaluation/models/evaluation_result.dart';
+import '../features/pose_evaluation/models/history_item.dart';
 
 /// 피드백 요청 결과 (성공/실패 원인 구분)
 class FeedbackResult {
@@ -135,22 +136,26 @@ class PoseFeedbackService {
     }
   }
 
-  /// 평가 이력 조회
-  Future<List<Map<String, dynamic>>> getHistory({required String token}) async {
-    try {
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/api/pose/history'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      );
+  /// 평가 이력 조회. 실패 시 예외 throw — 호출 측에서 에러 UI 처리.
+  Future<List<HistoryItem>> getHistory({required String token}) async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/pose/history'),
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ).timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return List<Map<String, dynamic>>.from(data['history'] ?? []);
-      }
-    } catch (_) {}
-    return [];
+    if (response.statusCode != 200) {
+      throw HttpException('history fetch failed: ${response.statusCode}');
+    }
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    final raw = data['history'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => HistoryItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   /// 오프라인 대기열에 결과 저장
