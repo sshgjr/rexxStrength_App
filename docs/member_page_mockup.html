@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>회원 페이지 UI 개선 — 비포 / 애프터</title>
+<style>
+  body { font-family: -apple-system, "Pretendard", system-ui, sans-serif; background:#f7f7f8; color:#1a1a1a; margin:0; padding:32px; }
+  h1 { margin:0 0 8px; font-size:24px; }
+  h2 { margin:28px 0 10px; font-size:16px; color:#16A34A; }
+  .lead { color:#555; font-size:14px; margin-bottom:20px; max-width:760px; }
+  .row { display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; }
+  .col { flex:1 1 320px; min-width:280px; }
+  .label { font-size:11px; color:#888; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
+
+  /* phone mock — Rexx dark theme */
+  .phone { width:300px; background:#0B0F0C; border-radius:24px; padding:18px 16px; color:#E9F5EF; box-shadow:0 6px 24px rgba(0,0,0,0.15); border:1px solid #222; }
+  .phone .hdr { display:flex; align-items:center; gap:8px; padding:6px 0 14px; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .phone .hdr .back { color:#A7B9B0; font-size:18px; }
+  .phone .hdr .title { font-weight:800; font-size:15px; }
+  .card { background:#0F1612; border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:14px; margin-top:14px; }
+  .profile { display:flex; gap:12px; align-items:center; }
+  .avatar { width:44px; height:44px; border-radius:50%; background:rgba(22,163,74,0.18); color:#16A34A; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; }
+  .name { font-weight:700; font-size:15px; }
+  .sub { color:#A7B9B0; font-size:12px; margin-top:2px; }
+  .divider { height:1px; background:rgba(255,255,255,0.06); margin:12px 0; }
+  .pill-row { display:flex; align-items:center; justify-content:space-between; }
+  .pill { background:rgba(22,163,74,0.12); border:1px solid rgba(22,163,74,0.3); color:#16A34A; padding:4px 10px; border-radius:14px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:6px; }
+  .pill .dot { width:6px; height:6px; background:#16A34A; border-radius:50%; }
+  .section-title { font-weight:800; font-size:14px; }
+  .section-sub { color:#A7B9B0; font-size:11px; margin-top:2px; margin-bottom:10px; }
+  .opt { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.04); margin-bottom:8px; font-size:12px; }
+  .opt.sel { background:rgba(22,163,74,0.12); border-color:rgba(22,163,74,0.5); color:#16A34A; font-weight:700; }
+  .radio { width:16px; height:16px; border-radius:50%; border:1.5px solid #A7B9B0; flex-shrink:0; }
+  .opt.sel .radio { border:2px solid #16A34A; background:#16A34A; }
+  .opt-desc { color:#A7B9B0; font-size:10px; font-weight:400; margin-left:auto; }
+  .btn-outline { display:block; text-align:center; padding:10px; border:1px solid #16A34A; color:#16A34A; border-radius:10px; font-size:12px; font-weight:700; margin-top:10px; }
+  .btn-danger { display:block; text-align:center; padding:11px; border:1px solid rgba(239,68,68,0.5); color:#EF4444; border-radius:10px; font-size:13px; font-weight:700; margin-top:14px; }
+
+  /* before mock — ugly default */
+  .phone-old { background:#fff; color:#000; }
+  .phone-old .hdr-old { background:#2196F3; color:#fff; padding:14px; margin:-18px -16px 12px; font-size:15px; font-weight:500; }
+  .phone-old .row-old { font-size:13px; margin:8px 0; }
+  .phone-old .radio-old { display:flex; gap:8px; align-items:center; font-size:12px; padding:6px 0; }
+  .phone-old .dot-old { width:14px; height:14px; border:2px solid #999; border-radius:50%; }
+
+  ul.notes { padding-left:18px; line-height:1.7; font-size:13px; max-width:760px; }
+  ul.notes li b { color:#16A34A; }
+  code { background:#f0f0f0; padding:1px 5px; border-radius:3px; font-size:12px; }
+</style>
+</head>
+<body>
+
+<h1>회원 페이지 UI 개선 — 비포 / 애프터</h1>
+<p class="lead">기존 회원 페이지가 라이트 머티리얼 기본값으로 렌더되어 다크 테마와 동떨어져 있고, 등급/소스 상태가 하드코딩되어 있었음. 다른 화면과 동일한 다크 그린 카드 레이아웃으로 재구성하고 <code>/me</code>에서 실제 값을 불러오도록 수정.</p>
+
+<h2>비포 / 애프터</h2>
+<div class="row">
+
+  <div class="col">
+    <div class="label">현재 (rough)</div>
+    <div class="phone phone-old">
+      <div class="hdr-old">회원 페이지</div>
+      <div class="row-old">닉네임: 현민</div>
+      <div class="row-old">이메일: hello@example.com</div>
+      <div style="border:1px solid #ccc; border-radius:8px; padding:10px; background:#0F1612; color:#E9F5EF; margin-top:8px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px;"><b>코칭 등급</b><span>초급</span></div>
+        <div style="font-size:10px; color:#A7B9B0; margin-top:2px;">현재: 기본값 (← 항상 하드코딩)</div>
+        <hr style="border-color:#1F2925; margin:10px 0;">
+        <div class="radio-old"><span class="dot-old"></span>초급 — 매우 상세한 피드백</div>
+        <div class="radio-old"><span class="dot-old"></span>중급 — 간결한 자세 교정</div>
+        <div class="radio-old"><span class="dot-old"></span>상급 — 핵심 위주, 미세 조정만</div>
+        <div style="border:1px solid #16A34A; color:#16A34A; padding:6px; text-align:center; border-radius:4px; margin-top:8px; font-size:11px;">신체정보·1RM 다시 입력하기</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">개선 후</div>
+    <div class="phone">
+      <div class="hdr"><span class="back">◂</span><span class="title">회원 정보</span></div>
+
+      <div class="card">
+        <div class="profile">
+          <div class="avatar">현</div>
+          <div>
+            <div class="name">현민</div>
+            <div class="sub">hello@example.com</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="pill-row">
+          <span style="font-size:12px; color:#A7B9B0;">현재 등급 · <span style="color:#E9F5EF; font-weight:700;">중급</span></span>
+          <span class="pill"><span class="dot"></span>자동 산정</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">코칭 등급</div>
+        <div class="section-sub">등급에 따라 AI 피드백 상세도가 달라집니다.</div>
+        <div class="opt"><span class="radio"></span>초급<span class="opt-desc">매우 상세</span></div>
+        <div class="opt sel"><span class="radio"></span>중급<span class="opt-desc">간결한 교정</span></div>
+        <div class="opt"><span class="radio"></span>상급<span class="opt-desc">핵심 위주</span></div>
+        <div class="btn-outline">신체정보·1RM 다시 입력하기</div>
+      </div>
+
+      <div class="btn-danger">로그아웃</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="label">데이터 흐름</div>
+    <pre style="background:#0F1612; color:#E9F5EF; padding:14px; border-radius:10px; font-size:11px; line-height:1.5; white-space:pre-wrap;">MemberPage.initState()
+  └─ AuthService.getMe(token)
+       └─ GET /me
+            (UserResponse + level_source)
+                ↓
+       setState(_level, _levelSource)
+                ↓
+       build → 프로필 카드 + 등급 카드 + 로그아웃</pre>
+    <div style="font-size:12px; color:#555; margin-top:8px;">실패 시 widget props로 폴백, snackbar로 안내.</div>
+  </div>
+</div>
+
+<h2>주요 변경점</h2>
+<ul class="notes">
+  <li><b>다크 테마 적용</b> — <code>Scaffold(backgroundColor: bg)</code> + 커스텀 헤더로 머티리얼 기본 AppBar 제거.</li>
+  <li><b>프로필 카드 신설</b> — 이니셜 아바타, 닉네임, 이메일, "현재 등급 + 소스 pill"을 하나의 카드에 통합.</li>
+  <li><b>실제 등급/소스 표시</b> — <code>/me</code>에 <code>level_source</code> 필드 추가. <code>AuthService.getMe()</code> 신규. 더 이상 하드코딩되지 않음.</li>
+  <li><b>등급 선택 UI 통일</b> — <code>RadioListTile</code>(머티리얼 라이트) → <code>_LevelTile</code>(다크 카드). 홈 화면의 <code>_LevelSettingsSheet</code>와 동일한 외관.</li>
+  <li><b>로그아웃 버튼 추가</b> — 확인 다이얼로그 후 <code>onLogout</code> 콜백을 통해 홈 상태 초기화.</li>
+</ul>
+
+</body>
+</html>

@@ -132,6 +132,23 @@ class AuthService {
     }
   }
 
+  /// 내 정보 조회 (level, level_source 포함).
+  Future<Map<String, dynamic>> getMe(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/me"),
+        headers: {"Authorization": "Bearer $token"},
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      throw Exception(_extractErrorDetail(response.body, '내 정보 조회 실패'));
+    } on SocketException {
+      throw Exception("서버에 연결할 수 없습니다.");
+    }
+  }
+
   /// 등급 수동 변경.
   Future<Map<String, dynamic>> updateLevel({
     required String token,

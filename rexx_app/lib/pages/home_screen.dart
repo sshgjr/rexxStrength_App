@@ -507,10 +507,24 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
             username: nickname,
             email: email ?? '',
             token: token ?? '',
+            onLogout: _logoutFromMember,
           ),
         ),
       );
     }
+  }
+
+  void _logoutFromMember() {
+    setState(() {
+      isLoggedIn = false;
+      nickname = '현민';
+      email = null;
+      token = null;
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('로그아웃 되었습니다.')),
+    );
   }
 
   @override
