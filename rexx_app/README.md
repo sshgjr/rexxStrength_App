@@ -9,63 +9,146 @@
 - **CocoaPods** (`sudo gem install cocoapods`)
 - Apple Developer 계정 (실기기 배포 시 필요)
 
-## 빌드 및 실행
+## 빌드 및 실행 (터미널 전용 가이드)
 
-### 1. 의존성 설치
+> Xcode 서명·기기 신뢰·시뮬레이터 생성·앱 실행 등 GUI 작업은 본인이 처리한다는 전제. 본 가이드는 **터미널에서만 해야 하는 부분**에 한합니다.
+
+### 0. 공통 준비 (한 번)
 
 ```bash
 cd rexx_app
 flutter pub get
 ```
 
-### 2. iOS Pod 설치
+CocoaPods가 없다면: `sudo gem install cocoapods`
 
-```bash
-cd ios
-pod install
-cd ..
+> **시뮬레이터 준비**: Xcode → Window → Devices and Simulators (`⇧⌘2`) → Simulators 탭 → **+** 로 본 작업 전용 시뮬레이터 생성을 권장. 본 가이드는 그 이름을 `<simulator-name>`으로 표기 (예: `rexx_without_ml`). 본인이 부여한 이름으로 치환해 사용하세요.
+
+ML Kit는 Apple Silicon Mac의 arm64 시뮬레이터를 지원하지 않으므로, 빌드 흐름이 두 갈래로 나뉩니다.
+
+```
+시뮬레이터(M1/M2/M3 Mac) → ML Kit 불가 → EXCLUDE_MLKIT=true + SIMULATOR_MODE=true → stub 사용
+실기기 iPhone           → ML Kit 정상  → 환경변수 없음                          → 실제 BlazePose
 ```
 
-> `pod install`이 실패하면 `pod repo update` 후 재시도하세요.
+---
 
-### 3. Xcode 서명 설정
+### A. 시뮬레이터 빌드 (ML Kit 제외)
 
-1. `ios/Runner.xcworkspace`를 Xcode로 열기
-2. Runner 타겟 → **Signing & Capabilities** 탭
-3. **Team**을 본인의 Apple Developer 계정으로 변경
-4. **Bundle Identifier**가 충돌하면 고유한 값으로 수정 (예: `com.yourname.rexxApp`)
+영상 업로드 시 stub 데이터(고정 시드의 가짜 스쿼트 모션)로 평가가 흐릅니다. UI/통신 흐름 검증 용도.
 
-### 4. 앱 실행
+#### A-1. 권장: 자동 스크립트
 
 ```bash
-# 연결된 기기/시뮬레이터에서 실행 (디버그 모드)
-flutter run
-
-# 디버그 모드 + 특정 기기 지정
-flutter devices                  # 연결된 기기 목록 확인
-flutter run -d <device_id>
-
-# 디버그 모드 (Hot Reload/Restart, DevTools, 디버그 배너 등 개발 도구 활성화)
-# flutter run은 기본이 --debug 이므로 동일합니다
-flutter run --debug
-
-# 프로파일 모드 (성능 측정용, DevTools 사용 가능하나 디버그 오버헤드 없음)
-flutter run --profile
-
-# 릴리즈 모드 (최종 배포용, 모든 디버그 기능 비활성화)
-flutter run --release
+cd rexx_app
+./scripts/run_simulator.sh <simulator-name>
 ```
 
-> **참고:** ML Kit 포즈 감지는 **실제 기기(iPhone)**에서만 정상 동작합니다. 시뮬레이터에서는 카메라/ML Kit 기능이 제한됩니다.
+스크립트가 자동으로 처리:
+1. 시뮬레이터 부팅
+2. `EXCLUDE_MLKIT=true` 환경에서 `flutter pub get` + `pod install`
+3. `flutter run --dart-define=SIMULATOR_MODE=true` 로 실행
+4. **종료 시 자동 복원** — `flutter pub get` + `pod install`을 다시 돌려 ML Kit 포함 상태로 되돌림
 
-### 5. Xcode에서 직접 실행하기
+#### A-2. 수동 명령
 
-Flutter 명령어 대신 Xcode에서 직접 빌드·실행할 수도 있습니다:
+```bash
+cd rexx_app
+export EXCLUDE_MLKIT=true
+flutter clean
+flutter pub get
+(cd ios && rm -rf Pods Podfile.lock && pod install)
+flutter run --dart-define=SIMULATOR_MODE=true -d <simulator-name>
+```
 
-1. `flutter pub get` 및 `pod install`이 완료된 상태에서
-2. `ios/Runner.xcworkspace`를 Xcode로 열기 (**`.xcodeproj`가 아닌 `.xcworkspace`를 열어야 합니다**)
-3. 상단에서 실행 대상 기기 선택
-4. **▶ Run** (⌘R) 버튼으로 빌드 및 실행
+종료 후 다른 빌드(특히 실기기)로 넘어가기 전 **반드시 복원**:
+
+```bash
+unset EXCLUDE_MLKIT
+flutter pub get
+(cd ios && pod install)
+```
+
+#### 두 플래그 의미
+
+| 플래그 | 층위 | 역할 |
+|---|---|---|
+| `EXCLUDE_MLKIT=true` (셸 환경변수) | iOS Pod 빌드 | `Podfile`이 이 변수를 읽고 ML Kit 의존성을 동적으로 제거. `pod install` 시점에만 영향 |
+| `--dart-define=SIMULATOR_MODE=true` | Dart 컴파일 타임 | `pose_analyzer.dart`의 `isSimulatorMode` 상수가 `true`로 박힘 → `PoseDetectorStub` 선택, ML Kit 호출 분기는 데드 코드로 트리 셰이킹 |
+
+**둘 다 필요합니다.** 한쪽만 쓰면:
+- `EXCLUDE_MLKIT`만: Dart는 여전히 ML Kit 호출 시도 → 런타임 크래시
+- `SIMULATOR_MODE`만: stub은 골랐지만 iOS arm64 빌드가 ML Kit 때문에 실패
+
+---
+
+### B. 실기기(iPhone) 빌드 (ML Kit 포함)
+
+터미널에서는 **pod 설치까지만** 처리. 이후 서명·기기 선택·Run은 Xcode에서.
+
+```bash
+cd rexx_app
+
+# (시뮬레이터 모드를 거쳤다면 반드시 먼저 복원)
+unset EXCLUDE_MLKIT
+flutter pub get
+(cd ios && rm -rf Pods Podfile.lock && pod install)
+
+# Xcode 워크스페이스 열기 (.xcodeproj가 아니라 .xcworkspace)
+open ios/Runner.xcworkspace
+```
+
+이후 Xcode에서:
+- Signing & Capabilities → Team 설정
+- 상단 디바이스 선택 → ▶ Run (⌘R)
+
+> CLI로 끝까지 가고 싶다면 (서명이 이미 잡혀 있는 전제):
+> ```bash
+> flutter devices            # 연결된 기기 ID 확인
+> flutter run -d <device-id>
+> ```
+
+---
+
+### C. 모드 전환 체크리스트
+
+| 직전 상태 | 다음 작업 | 필수 명령 |
+|---|---|---|
+| 시뮬레이터(EXCLUDE_MLKIT) | 실기기 | `unset EXCLUDE_MLKIT && flutter pub get && (cd ios && rm -rf Pods Podfile.lock && pod install)` |
+| 실기기 | 시뮬레이터 | A 섹션 절차 그대로 |
+
+> `ios/Podfile.lock`, `ios/Runner.xcodeproj/project.pbxproj`, `ios/Runner/GeneratedPluginRegistrant.m`이 변형돼도 **커밋 금지** — 모드별로 자동 변형되는 산출물입니다.
+
+---
+
+### D. 자주 겪는 터미널 오류
+
+| 메시지 | 원인 / 해결 |
+|---|---|
+| `Undefined symbol: _OBJC_CLASS_$_GoogleMLKit...` | `EXCLUDE_MLKIT` 안 풀고 실기기 빌드. C의 복원 명령 실행 |
+| `arm64` 관련 link error (시뮬레이터) | `EXCLUDE_MLKIT=true` 누락한 채 `pod install` 함 |
+| `Generated.xcconfig must exist` | `flutter pub get`을 `rexx_app/`에서 안 돌림 |
+| `pod install` 후에도 ML Kit 잔존 | 캐시 문제. `(cd ios && rm -rf Pods Podfile.lock && pod install)` 다시 |
+| 시뮬레이터 영상 업로드 후 점수가 항상 비슷 | 정상. stub이 고정 시드(42)로 mock 스쿼트 데이터 반환 |
+
+---
+
+### E. 모드별 동작 검증
+
+`pose_analyzer.dart`의 `isSimulatorMode` 상수가 분기 진입점:
+```dart
+const bool isSimulatorMode =
+    bool.fromEnvironment('SIMULATOR_MODE', defaultValue: false);
+
+PoseAnalyzer()
+    : _detector =
+          isSimulatorMode ? PoseDetectorStub() : MLKitPoseDetector();
+```
+
+- 시뮬레이터: `SIMULATOR_MODE=true` 컴파일 타임 주입 → `PoseDetectorStub`
+- 실기기: 미주입(default false) → `MLKitPoseDetector`
+
+ML Kit 사용은 `pose_detector_mlkit.dart` 한 파일에 격리되어 있어, 시뮬레이터 빌드에서는 호출 자체가 일어나지 않습니다.
 
 ## 기타 명령어
 
