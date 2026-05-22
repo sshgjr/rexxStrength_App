@@ -9,11 +9,14 @@ import '../widgets/level_suggestion_sheet.dart';
 class PoseResultScreen extends StatefulWidget {
   final EvaluationResult result;
   final String? token;
+  /// 과거 기록 다시보기 진입 여부. true면 레벨 추천 시트·게스트 유도 등 신규 평가 한정 인터랙션을 비활성화.
+  final bool fromHistory;
 
   const PoseResultScreen({
     super.key,
     required this.result,
     this.token,
+    this.fromHistory = false,
   });
 
   @override
@@ -28,7 +31,7 @@ class _PoseResultScreenState extends State<PoseResultScreen> {
   @override
   void initState() {
     super.initState();
-    if (!_isGuest) {
+    if (!_isGuest && !widget.fromHistory) {
       _checkLevelSuggestion();
     }
   }
@@ -88,6 +91,10 @@ class _PoseResultScreenState extends State<PoseResultScreen> {
   }
 
   void _onHomePressed() async {
+    if (widget.fromHistory) {
+      Navigator.pop(context);
+      return;
+    }
     if (_isGuest) {
       final shouldExit = await _handleGuestExit();
       if (shouldExit && mounted) {
@@ -101,7 +108,7 @@ class _PoseResultScreenState extends State<PoseResultScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: !_isGuest,
+      canPop: widget.fromHistory || !_isGuest,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         final shouldExit = await _handleGuestExit();
@@ -115,7 +122,9 @@ class _PoseResultScreenState extends State<PoseResultScreen> {
           backgroundColor: bg,
           foregroundColor: textMain,
           title: Text(
-            '${widget.result.exerciseType.displayName} 코칭',
+            widget.fromHistory
+                ? '${widget.result.exerciseType.displayName} 기록'
+                : '${widget.result.exerciseType.displayName} 코칭',
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
           elevation: 0,
@@ -147,9 +156,9 @@ class _PoseResultScreenState extends State<PoseResultScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    '홈으로 돌아가기',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  child: Text(
+                    widget.fromHistory ? '기록으로 돌아가기' : '홈으로 돌아가기',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),

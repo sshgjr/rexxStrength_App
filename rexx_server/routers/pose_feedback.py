@@ -98,8 +98,21 @@ def get_history(
             total_score=e.total_score,
             feedback_text=e.feedback_text,
             created_at=e.created_at,
+            criteria_scores=_safe_json_list(e.criteria_scores_json),
+            detected_issues=_safe_json_list(e.detected_issues_json),
         )
         for e in evaluations
     ]
 
     return {"success": True, "history": history}
+
+
+def _safe_json_list(raw: str | None):
+    """저장된 JSON 문자열을 파싱. 비어있거나 깨졌으면 빈 리스트 반환."""
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else []
+    except (ValueError, TypeError):
+        return []

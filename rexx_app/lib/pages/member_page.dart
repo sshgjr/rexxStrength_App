@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../features/onboarding/onboarding_flow.dart';
 import '../features/pose_evaluation/engine/layer_classifier.dart';
+import '../features/pose_evaluation/screens/history_list_screen.dart';
 
 const Color _bg = Color(0xFF0B0F0C);
 const Color _card = Color(0xFF0F1612);
@@ -159,6 +160,15 @@ class _MemberPageState extends State<MemberPage> {
                       level: _level,
                       levelSource: _levelSource,
                       loading: _loading,
+                    ),
+                    const SizedBox(height: 14),
+                    _HistoryEntryCard(
+                      onTap: () {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) =>
+                              HistoryListScreen(token: widget.token),
+                        ));
+                      },
                     ),
                     const SizedBox(height: 14),
                     _LevelSettingsSection(
@@ -379,6 +389,67 @@ class _ProfileCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HistoryEntryCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _HistoryEntryCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.history_rounded,
+                  color: _primary, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '운동 기록 보기',
+                    style: TextStyle(
+                      color: _textMain,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    '최근 평가한 자세 점수와 피드백 다시보기',
+                    style: TextStyle(color: _textSub, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: _textSub, size: 20),
+          ],
+        ),
       ),
     );
   }

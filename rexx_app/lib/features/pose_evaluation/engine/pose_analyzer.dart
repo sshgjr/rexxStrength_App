@@ -1,8 +1,6 @@
 import 'dart:io';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart' as mlkit;
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:video_player/video_player.dart';
-import '../models/pose_frame.dart';
 import '../models/exercise_phase.dart';
 import '../models/evaluation_result.dart';
 import '../models/debug_analysis_data.dart';
@@ -11,6 +9,8 @@ import 'rules/squat_rules.dart';
 import 'rules/bench_press_rules.dart';
 import 'rules/deadlift_rules.dart';
 import 'rules/wrist_curl_rules.dart';
+import 'pose_detector_interface.dart';
+import 'pose_detector_mlkit.dart';
 import 'pose_detector_stub.dart';
 import 'classifier/exercise_classifier.dart';
 import '../models/classification_result.dart';
@@ -20,21 +20,11 @@ const bool isSimulatorMode =
     bool.fromEnvironment('SIMULATOR_MODE', defaultValue: false);
 
 class PoseAnalyzer {
-  mlkit.PoseDetector? _poseDetector;
-  PoseDetectorStub? _stub;
+  final PoseDetectorInterface _detector;
 
-  PoseAnalyzer() {
-    if (isSimulatorMode) {
-      _stub = PoseDetectorStub();
-    } else {
-      _poseDetector = mlkit.PoseDetector(
-        options: mlkit.PoseDetectorOptions(
-          mode: mlkit.PoseDetectionMode.single,
-          model: mlkit.PoseDetectionModel.accurate,
-        ),
-      );
-    }
-  }
+  PoseAnalyzer()
+      : _detector =
+            isSimulatorMode ? PoseDetectorStub() : MLKitPoseDetector();
 
   Future<EvaluationResult> analyze({
     required String videoPath,
@@ -48,12 +38,7 @@ class PoseAnalyzer {
     final frames = await _extractFrames(videoPath);
     onProgress?.call(0.3);
 
-    final List<PoseFrame> poseFrames;
-    if (isSimulatorMode) {
-      poseFrames = await _stub!.detectPoses(frames);
-    } else {
-      poseFrames = await _detectPoses(frames);
-    }
+    final poseFrames = await _detector.detectPoses(frames);
     onProgress?.call(0.7);
 
     final ExerciseType resolvedType;
@@ -119,12 +104,7 @@ class PoseAnalyzer {
     final frames = await _extractFrames(videoPath);
     onProgress?.call(0.3);
 
-    final List<PoseFrame> poseFrames;
-    if (isSimulatorMode) {
-      poseFrames = await _stub!.detectPoses(frames);
-    } else {
-      poseFrames = await _detectPoses(frames);
-    }
+    final poseFrames = await _detector.detectPoses(frames);
     onProgress?.call(0.7);
 
     final ExerciseType resolvedType;
@@ -222,38 +202,6 @@ class PoseAnalyzer {
     return framePaths;
   }
 
-  Future<List<PoseFrame>> _detectPoses(List<String> framePaths) async {
-    final poseFrames = <PoseFrame>[];
-
-    for (int i = 0; i < framePaths.length; i++) {
-      final inputImage = mlkit.InputImage.fromFilePath(framePaths[i]);
-      final poses = await _poseDetector!.processImage(inputImage);
-
-      if (poses.isNotEmpty) {
-        final pose = poses.first;
-        final landmarks =
-            pose.landmarks.entries.map<PoseLandmark>((entry) {
-          final lm = entry.value;
-          return PoseLandmark(
-            index: entry.key.index,
-            x: lm.x,
-            y: lm.y,
-            z: lm.z,
-            likelihood: lm.likelihood,
-          );
-        }).toList();
-
-        poseFrames.add(PoseFrame(
-          frameIndex: i,
-          timestamp: i / 5.0,
-          landmarks: landmarks,
-        ));
-      }
-    }
-
-    return poseFrames;
-  }
-
   ExerciseRule _getRule(ExerciseType type) {
     switch (type) {
       case ExerciseType.squat:
@@ -282,10 +230,6 @@ class PoseAnalyzer {
   }
 
   void dispose() {
-    if (isSimulatorMode) {
-      _stub?.close();
-    } else {
-      _poseDetector?.close();
-    }
+    _detector.close();
   }
 }
