@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 class _ExerciseOption {
   final String id;
   final String label;
-  final String emoji;
+  final IconData icon;
   final String reaction;
 
   const _ExerciseOption({
     required this.id,
     required this.label,
-    required this.emoji,
+    required this.icon,
     required this.reaction,
   });
 }
@@ -18,37 +18,37 @@ const List<_ExerciseOption> _exerciseOptions = [
   _ExerciseOption(
     id: 'powerlifting',
     label: '3대 운동',
-    emoji: '🏋️',
+    icon: Icons.fitness_center,
     reaction: '오, 3대 운동을 좋아하시는군요! 스쿼트·벤치·데드리프트 자세 분석으로 함께 성장해봐요!',
   ),
   _ExerciseOption(
     id: 'bodyweight',
     label: '맨몸 운동',
-    emoji: '🤸',
+    icon: Icons.accessibility_new,
     reaction: '어디서든 할 수 있는 맨몸 운동! 기본기가 탄탄하시겠네요!',
   ),
   _ExerciseOption(
     id: 'cardio',
     label: '유산소',
-    emoji: '🏃',
+    icon: Icons.directions_run,
     reaction: '꾸준한 유산소 운동, 체력의 기본이죠! 응원합니다!',
   ),
   _ExerciseOption(
     id: 'yoga',
     label: '요가/필라테스',
-    emoji: '🧘',
+    icon: Icons.self_improvement,
     reaction: '유연성과 코어를 동시에! 자세에 대한 감각이 남다르시겠네요!',
   ),
   _ExerciseOption(
     id: 'martial_arts',
     label: '격투기',
-    emoji: '🥊',
+    icon: Icons.sports_mma,
     reaction: '격투기 좋아하시는군요! 강인한 정신력이 느껴집니다!',
   ),
   _ExerciseOption(
     id: 'swimming',
     label: '수영',
-    emoji: '🏊',
+    icon: Icons.pool,
     reaction: '전신 운동의 왕, 수영! 균형 잡힌 체력을 가지고 계시겠네요!',
   ),
 ];
@@ -165,7 +165,11 @@ class _Step3InterestsState extends State<Step3Interests> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('💬', style: TextStyle(fontSize: 18)),
+                    const Icon(
+                      Icons.chat_bubble_outline,
+                      size: 18,
+                      color: primary,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -208,15 +212,28 @@ class _Step3InterestsState extends State<Step3Interests> {
                         strokeWidth: 2,
                       ),
                     )
-                  : Text(
-                      '🎉 시작하기!',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _selected.isNotEmpty
-                            ? Colors.white
-                            : textSub.withValues(alpha: 0.5),
-                      ),
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.celebration,
+                          size: 18,
+                          color: _selected.isNotEmpty
+                              ? Colors.white
+                              : textSub.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '시작하기!',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: _selected.isNotEmpty
+                                ? Colors.white
+                                : textSub.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
                     ),
             ),
           ),
@@ -257,9 +274,10 @@ class _Step3InterestsState extends State<Step3Interests> {
                     : [],
               ),
               child: Center(
-                child: Text(
-                  option.emoji,
-                  style: const TextStyle(fontSize: 30),
+                child: Icon(
+                  option.icon,
+                  size: 32,
+                  color: isSelected ? primary : primary.withValues(alpha: 0.6),
                 ),
               ),
             ),

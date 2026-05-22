@@ -111,7 +111,11 @@ class _LoginPageState extends State<LoginPage> {
                   border: Border.all(color: primary.withValues(alpha: 0.25), width: 2),
                 ),
                 child: const Center(
-                  child: Text('💪', style: TextStyle(fontSize: 28)),
+                  child: Icon(
+                    Icons.sports_gymnastics,
+                    size: 32,
+                    color: primary,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),

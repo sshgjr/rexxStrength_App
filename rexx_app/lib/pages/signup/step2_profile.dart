@@ -166,7 +166,11 @@ class _Step2ProfileState extends State<Step2Profile> {
             ),
             child: Row(
               children: [
-                const Text('🔒', style: TextStyle(fontSize: 18)),
+                const Icon(
+                  Icons.lock_outline,
+                  size: 18,
+                  color: primary,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
