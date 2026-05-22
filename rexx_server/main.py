@@ -107,6 +107,7 @@ class UserResponse(BaseModel):
     is_body_public: bool = False
     interests: Optional[List[str]] = None
     level: str = "beginner"
+    level_source: Optional[str] = None
 
 class AuthResponse(BaseModel):
     success: bool
@@ -127,6 +128,7 @@ def _user_response(user: User) -> dict:
         "is_body_public": user.is_body_public,
         "interests": json.loads(user.interests) if user.interests else None,
         "level": user.level,
+        "level_source": user.level_source,
     }
 
 # =========================

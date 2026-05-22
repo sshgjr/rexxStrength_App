@@ -467,17 +467,17 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
 
   Future<void> _handleLoginButton() async {
     if (isLoggedIn) {
-      setState(() {
-        isLoggedIn = false;
-        nickname = '현민';
-        email = null;
-        token = null;
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(
+      Navigator.push(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그아웃 되었습니다.')));
+        MaterialPageRoute(
+          builder: (_) => MemberPage(
+            username: nickname,
+            email: email ?? '',
+            token: token ?? '',
+            onLogout: _logoutFromMember,
+          ),
+        ),
+      );
       return;
     }
 
@@ -496,21 +496,22 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
 
       if (!mounted) return;
 
-      // 온보딩 필요 시 먼저 온보딩 진행
+      // 온보딩 필요 시 진행 (완료 후 홈에 머무름)
       await _maybeStartOnboarding();
-
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => MemberPage(
-            username: nickname,
-            email: email ?? '',
-            token: token ?? '',
-          ),
-        ),
-      );
     }
+  }
+
+  void _logoutFromMember() {
+    setState(() {
+      isLoggedIn = false;
+      nickname = '현민';
+      email = null;
+      token = null;
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('로그아웃 되었습니다.')),
+    );
   }
 
   @override
@@ -674,17 +675,15 @@ class _RexxHomeScreenState extends State<RexxHomeScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (!isLoggedIn) ...[
-                            const Icon(
-                              Icons.person_outline,
-                              size: 20,
-                              color: primary,
-                            ),
-                            const SizedBox(width: 4),
-                          ],
+                          Icon(
+                            Icons.person_outline,
+                            size: 20,
+                            color: isLoggedIn ? textSub : primary,
+                          ),
+                          const SizedBox(width: 4),
                           Flexible(
                             child: Text(
-                              isLoggedIn ? '$nickname님 (로그아웃)' : '로그인',
+                              isLoggedIn ? '$nickname님' : '로그인',
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: isLoggedIn ? textSub : primary,
